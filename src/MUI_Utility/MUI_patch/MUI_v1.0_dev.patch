@@ -1,0 +1,3308 @@
+diff -uraN MUI-1.0/CMakeLists.txt v1.1_dev/CMakeLists.txt
+--- MUI-1.0/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
++++ v1.1_dev/CMakeLists.txt	2020-10-27 15:26:55.000000000 +0000
+@@ -0,0 +1,66 @@
++cmake_minimum_required(VERSION 3.9)
++project(MUI VERSION 1.0 DESCRIPTION "Multiscale Universal Interface" LANGUAGES CXX)
++
++set(CMAKE_CXX_STANDARD 11)
++set(CMAKE_CXX_STANDARD_REQUIRED ON)
++set(CMAKE_CXX_EXTENSIONS OFF)
++
++include(sourcelist.cmake)
++
++find_package(MPI REQUIRED)
++if (MPI_FOUND)
++	include_directories(SYSTEM ${MPI_INCLUDE_PATH})
++else (MPI_FOUND)
++	message(SEND_ERROR "MPI not found")
++endif (MPI_FOUND)
++
++option(use_RBF OFF)
++
++if(use_RBF)
++    find_package(Eigen3 REQUIRED)
++endif(use_RBF)
++
++add_library(mui INTERFACE)
++
++target_include_directories (mui INTERFACE
++	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
++	$<INSTALL_INTERFACE:include>
++)
++
++if(use_RBF)
++    target_link_libraries(mui INTERFACE Eigen3::Eigen)
++endif(use_RBF)
++
++target_compile_definitions(mui INTERFACE LIBRARY_HEADER_ONLY)
++
++install( TARGETS mui EXPORT muiTargets INCLUDES DESTINATION include LIBRARY DESTINATION lib )
++install( DIRECTORY ${CMAKE_SOURCE_DIR}/ 
++	     DESTINATION ${CMAKE_INSTALL_PREFIX}/include 
++		 FILES_MATCHING PATTERN "*.h"
++	   )
++
++install( EXPORT muiTargets DESTINATION ${CMAKE_INSTALL_PREFIX}/share/mui/cmake/)
++install(FILES mui-config.cmake DESTINATION ${CMAKE_INSTALL_PREFIX}/share/mui/cmake)
++
++
++add_library(wrapper_c SHARED ./wrappers/C/mui_3d.cpp)
++set_target_properties(wrapper_c PROPERTIES PUBLIC_HEADER ./wrappers/C/mui_3d.h)
++target_include_directories(wrapper_c PRIVATE .)
++if(use_RBF)
++    target_link_libraries(wrapper_c Eigen3::Eigen ${MPI_CXX_LIBRARIES})
++else()
++    target_link_libraries(wrapper_c ${MPI_CXX_LIBRARIES})
++endif(use_RBF)
++install(TARGETS wrapper_c
++    LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/
++    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_PREFIX}/include/wrappers/C/)
++
++
++add_library(wrapper_f SHARED ./wrappers/Fortran/mui_3df.cpp)
++target_include_directories(wrapper_f PRIVATE .)
++if(use_RBF)
++    target_link_libraries(wrapper_f Eigen3::Eigen)
++endif(use_RBF)
++
++install(TARGETS wrapper_f
++    LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/)
+diff -uraN MUI-1.0/bin.h v1.1_dev/bin.h
+--- MUI-1.0/bin.h	2020-01-31 11:48:46.000000000 +0000
++++ v1.1_dev/bin.h	2020-10-27 15:26:55.000000000 +0000
+@@ -221,6 +221,7 @@
+ private:
+ 	using point_type = typename CONFIG::point_type;
+ 	static const int D = CONFIG::D;
++	static const bool QUIET = CONFIG::QUIET;
+ 
+ 	std::vector<std::size_t> displs;
+ 	// sorted[displs[i]] is the first element of the i-th bin
+@@ -271,8 +272,8 @@
+ 
+ 		if(almost_equal(h, static_cast<REAL>(0))){ // if h is still zero (only in the case of all dimensions being zero) then warn the user as this may be a problem
+ 			h = static_cast<REAL>(1); // in this special case set h to 1 arbitrarily so bins work numerically
+-			if(val.size() > 1)
+-				std::cerr << "MUI Warning [bin.h]: Bin support size fixed to 1.0, check interface dimensionality or problem decomposition." << std::endl;
++			if(val.size() > 1 && !QUIET)
++				std::cout << "MUI Warning [bin.h]: Bin support size fixed to 1.0, check interface dimensionality or problem decomposition." << std::endl;
+ 		}
+ 
+ 		std::size_t nn=1;
+diff -uraN MUI-1.0/chrono_samplers/chrono_sampler_exact.h v1.1_dev/chrono_samplers/chrono_sampler_exact.h
+--- MUI-1.0/chrono_samplers/chrono_sampler_exact.h	2020-01-31 11:48:46.000000000 +0000
++++ v1.1_dev/chrono_samplers/chrono_sampler_exact.h	2020-10-27 15:26:55.000000000 +0000
+@@ -67,18 +67,34 @@
+       tolerance = tol*real_precision;
+ 	}
+ 
++	//- Filter based on single time value
+ 	template<typename TYPE>
+-	TYPE filter( time_type focus, const std::vector<std::pair<time_type, TYPE> > &points ) const {
++	TYPE filter( time_type focus, const std::vector<std::pair<std::pair<time_type,time_type>, TYPE> > &points ) const {
+ 	    for( auto i: points ) {
+-			if ( std::abs(i.first - focus) <= tolerance ) {
++			if ( std::abs(i.first.first - focus) <= tolerance ) {
+ 				return i.second;
+ 			}
+ 		}
++
+ 		return TYPE();
+ 	}
++
++	//- Filter based on two time values
++	template<typename TYPE>
++	TYPE filter( std::pair<time_type,time_type> focus, const std::vector<std::pair<std::pair<time_type,time_type>, TYPE> > &points ) const {
++		for( auto i: points ) {
++			if ( std::abs(i.first.first - focus.first) <= tolerance && std::abs(i.first.second - focus.second) <= tolerance ) {
++				return i.second;
++			}
++		}
++
++		return TYPE();
++	}
++
+ 	time_type get_upper_bound( time_type focus ) const {
+ 		return focus;
+ 	}
++
+ 	time_type get_lower_bound( time_type focus ) const {
+ 		return focus;
+ 	}
+diff -uraN MUI-1.0/chrono_samplers/chrono_sampler_gauss.h v1.1_dev/chrono_samplers/chrono_sampler_gauss.h
+--- MUI-1.0/chrono_samplers/chrono_sampler_gauss.h	2020-01-31 11:48:46.000000000 +0000
++++ v1.1_dev/chrono_samplers/chrono_sampler_gauss.h	2020-10-27 15:26:55.000000000 +0000
+@@ -64,12 +64,13 @@
+ 		cutoff = newcutoff;
+ 	}
+ 
++	//- Filter based on single time value
+ 	template<typename TYPE>
+-	TYPE filter( time_type focus, const std::vector<std::pair<time_type, TYPE> > &points ) const {
++	TYPE filter( time_type focus, const std::vector<std::pair<std::pair<time_type,time_type>, TYPE> > &points ) const {
+ 		REAL wsum = REAL(0);
+ 		TYPE vsum = TYPE(0);
+ 		for( auto i: points ) {
+-			time_type dt = std::abs(i.first - focus);
++			time_type dt = std::abs(i.first.first - focus);
+ 			if ( dt < cutoff ) {
+ 				REAL w = pow( 2*PI*sigma, -0.5 ) * exp( -0.5 * dt * dt / sigma );
+ 				vsum += i.second * w;
+@@ -78,12 +79,32 @@
+ 		}
+ 		return ( wsum > std::numeric_limits<REAL>::epsilon() ) ? ( vsum / wsum ) : TYPE(0);
+ 	}
++
++	//- Filter based on two time values
++	template<typename TYPE>
++	TYPE filter( std::pair<time_type,time_type> focus, const std::vector<std::pair<std::pair<time_type,time_type>, TYPE> > &points ) const {
++		REAL wsum = REAL(0);
++		TYPE vsum = TYPE(0);
++		for( auto i: points ) {
++			time_type dt1 = std::abs(i.first.first - focus.first);
++			time_type dt2 = std::abs(i.first.second - focus.second);
++			if ( dt1 < cutoff && dt2 < cutoff ) {
++				REAL w = pow( 2*PI*sigma, -0.5 ) * exp( -0.5 * dt1 * dt1 / sigma );
++				vsum += i.second * w;
++				wsum += w;
++			}
++		}
++		return ( wsum > std::numeric_limits<REAL>::epsilon() ) ? ( vsum / wsum ) : TYPE(0);
++	}
++
+ 	time_type get_upper_bound( time_type focus ) const {
+ 		return focus + cutoff;
+ 	}
++
+ 	time_type get_lower_bound( time_type focus ) const {
+ 		return focus - cutoff;
+ 	}
++
+ 	time_type tolerance() const {
+ 		return time_type(0);
+ 	}
+diff -uraN MUI-1.0/chrono_samplers/chrono_sampler_mean.h v1.1_dev/chrono_samplers/chrono_sampler_mean.h
+--- MUI-1.0/chrono_samplers/chrono_sampler_mean.h	2020-01-31 11:48:46.000000000 +0000
++++ v1.1_dev/chrono_samplers/chrono_sampler_mean.h	2020-10-27 15:26:55.000000000 +0000
+@@ -64,23 +64,49 @@
+ 		right  = newright;
+ 	}
+ 
++	//- Filter based on single time value
+ 	template<typename TYPE>
+-	TYPE filter( time_type focus, const std::vector<std::pair<time_type, TYPE> > &points ) const {
++	TYPE filter( time_type focus, const std::vector<std::pair<std::pair<time_type,time_type>, TYPE> > &points ) const {
+ 		TYPE sum = TYPE(0);
++
+ 		for( auto i: points ) {
+-			if ( i.first <= focus + right && i.first >= focus - left ) {
++			if ( i.first.first <= focus + right && i.first.first >= focus - left ) {
+ 				sum += i.second;
+ 			}
+ 		}
+-		if ( points.size() ) return sum / TYPE(points.size());
+-		else return TYPE(0);
++
++		if ( points.size() )
++			return sum / TYPE(points.size());
++		else
++			return TYPE(0);
+ 	}
++
++	//- Filter based on two time values
++	template<typename TYPE>
++	TYPE filter( std::pair<time_type,time_type> focus, const std::vector<std::pair<std::pair<time_type,time_type>, TYPE> > &points ) const {
++		TYPE sum = TYPE(0);
++
++		for( auto i: points ) {
++			if ( i.first.first <= focus.first + right && i.first.first >= focus.first - left &&
++				 i.first.second <= focus.second + right && i.first.second >= focus.second - left	) {
++				sum += i.second;
++			}
++		}
++
++		if ( points.size() )
++			return sum / TYPE(points.size());
++		else
++			return TYPE(0);
++	}
++
+ 	time_type get_upper_bound( time_type focus ) const {
+ 		return focus + right;
+ 	}
++
+ 	time_type get_lower_bound( time_type focus ) const {
+ 		return focus - left;
+ 	}
++
+ 	time_type tolerance() const {
+ 		return time_type(0);
+ 	}	
+diff -uraN MUI-1.0/chrono_samplers/chrono_sampler_null.h v1.1_dev/chrono_samplers/chrono_sampler_null.h
+--- MUI-1.0/chrono_samplers/chrono_sampler_null.h	2020-01-31 11:48:46.000000000 +0000
++++ v1.1_dev/chrono_samplers/chrono_sampler_null.h	2020-10-27 15:26:55.000000000 +0000
+@@ -63,16 +63,26 @@
+ 		// to do: initialization
+ 	}
+ 
++	//- Filter based on single time value
+ 	template<typename TYPE>
+-	TYPE filter( time_type focus, const std::vector<std::pair<time_type, TYPE> > &points ) const {
++	TYPE filter( time_type focus, const std::vector<std::pair<std::pair<time_type,time_type>, TYPE> > &points ) const {
+ 		// to do: interpolation algorithm
+ 	}
++
++	//- Filter based on two time values
++	template<typename TYPE>
++	TYPE filter( std::pair<time_type,time_type> focus, const std::vector<std::pair<std::pair<time_type,time_type>, TYPE> > &points ) const {
++		// to do: interpolation algorithm
++	}
++
+ 	time_type get_upper_bound( time_type focus ) const {
+ 		// to do: return newest time needed with regard to focus
+ 	}
++
+ 	time_type get_lower_bound( time_type focus ) const {
+ 		// to do: return oldest time needed with regard to focus
+ 	}
++
+ 	time_type tolerance() const {
+ 		return time_type(0);
+ 	}
+diff -uraN MUI-1.0/chrono_samplers/chrono_sampler_sum.h v1.1_dev/chrono_samplers/chrono_sampler_sum.h
+--- MUI-1.0/chrono_samplers/chrono_sampler_sum.h	2020-01-31 11:48:46.000000000 +0000
++++ v1.1_dev/chrono_samplers/chrono_sampler_sum.h	2020-10-27 15:26:55.000000000 +0000
+@@ -64,22 +64,43 @@
+ 		right  = newright;
+ 	}
+ 
++	//- Filter based on single time value
+ 	template<typename TYPE>
+-	TYPE filter( time_type focus, const std::vector<std::pair<time_type, TYPE> > &points ) const {
++	TYPE filter( time_type focus, const std::vector<std::pair<std::pair<time_type,time_type>, TYPE> > &points ) const {
+ 		TYPE sum = TYPE(0);
++
++		for( auto i: points ) {
++			if ( i.first.first <= focus + right && i.first.first >= focus - left ) {
++				sum += i.second;
++			}
++		}
++
++		return sum;
++	}
++
++	//- Filter based on two time values
++	template<typename TYPE>
++	TYPE filter( std::pair<time_type,time_type> focus, const std::vector<std::pair<std::pair<time_type,time_type>, TYPE> > &points ) const {
++		TYPE sum = TYPE(0);
++
+ 		for( auto i: points ) {
+-			if ( i.first <= focus + right && i.first >= focus - left ) {
++			if ( i.first.first <= focus.first + right && i.first.first >= focus.first - left &&
++				 i.first.second <= focus.second + right && i.first.second >= focus.second - left) {
+ 				sum += i.second;
+ 			}
+ 		}
++
+ 		return sum;
+ 	}
++
+ 	time_type get_upper_bound( time_type focus ) const {
+ 		return focus + right;
+ 	}
++
+ 	time_type get_lower_bound( time_type focus ) const {
+ 		return focus - left;
+ 	}
++
+ 	time_type tolerance() const {
+ 		return time_type(0);
+ 	}	
+diff -uraN MUI-1.0/comm_mpi.h v1.1_dev/comm_mpi.h
+--- MUI-1.0/comm_mpi.h	2020-01-31 11:48:46.000000000 +0000
++++ v1.1_dev/comm_mpi.h	2021-02-15 21:29:12.527944000 +0000
+@@ -71,9 +71,8 @@
+ 	}
+ 
+ 	void init( const char URI[], MPI_Comm world ) {
+-		if ( initialized ) {
++		if ( initialized )
+ 			throw( std::runtime_error("MUI Error [comm_mpi.h]: Duplicate MUI communicator initialization") );
+-		}
+ 
+ 		// check MPI initialization status
+ 		int init;
+@@ -87,9 +86,8 @@
+ 		if (world == MPI_COMM_WORLD) MPI_Comm_dup( MPI_COMM_WORLD, &world );
+ 		MPI_Comm_size( world, &global_size_ );
+ 		MPI_Comm_rank( world, &global_rank_ );
+-		if (global_size_ < 2) {
+-			std::cerr <<  "MUI Warning [comm_mpi.h]: Number of global ranks less than 2" << std::endl;
+-		}
++		if (global_size_ < 2)
++			std::cout <<  "MUI Warning [comm_mpi.h]: Number of global ranks less than 2" << std::endl;
+ 
+ 		// get upper bond for tag hash
+ 		int prime;
+@@ -125,13 +123,14 @@
+ 		MPI_Comm_remote_size( domain_remote_, &remote_size_ );
+ 
+ 		// output for debugging
+-		for( int i=0;i<global_size_;i++ ) {
+-			if ( i == global_rank_ )
+-				std::cout	<<"rank "<<global_rank_<<'\t'
+-							<<"identifier "<<URI<<'\t'
+-							<<"domain size "<<local_size_<<'\t'
+-							<<"peer number "<<remote_size_<<'\t'
+-							<<std::endl;
++		for( int i = 0; i < global_size_; i++ ) {
++			if ( i == global_rank_ ) {
++				std::cout	<< "MUI [comm_mpi.h]: rank " << global_rank_ << '\t'
++							<< "identifier " << URI << '\t'
++							<< "domain size " << local_size_ << '\t'
++							<< "peer number " << remote_size_ << '\t'
++							<< std::endl;
++			}
+ 			MPI_Barrier( world );
+ 		}
+ 
+diff -uraN MUI-1.0/comm_mpi_smart.h v1.1_dev/comm_mpi_smart.h
+--- MUI-1.0/comm_mpi_smart.h	2020-01-31 11:48:46.000000000 +0000
++++ v1.1_dev/comm_mpi_smart.h	2021-02-15 21:29:12.529938100 +0000
+@@ -48,6 +48,8 @@
+ #ifndef COMM_MPI_SMART_H
+ #define COMM_MPI_SMART_H
+ 
++#include <cstdint>
++#include <cstdlib>
+ #include "util.h"
+ #include "comm.h"
+ #include "comm_mpi.h"
+@@ -70,6 +72,12 @@
+ 		auto bytes = std::make_shared<std::vector<char> >(msg.detach());
+ 		for( int i = 0 ; i < remote_size_ ; i++ ){
+ 			if( is_sending[i] ){
++				if(bytes->size() > INT_MAX){
++					std::cerr << "MUI Error [comm_mpi_smart.h]: Trying to send more data than is possible with MPI_Isend." << std::endl
++							  << "This is likely because there is too much data per MPI rank." << std::endl
++							  << "The program will now abort. Try increasing the number of MPI ranks." << std::endl;
++					std::abort();
++				}
+ 				send_buf.emplace_back(MPI_Request(), bytes);
+ 				MPI_Isend(bytes->data(), bytes->size(), MPI_BYTE, i, 0, 
+ 				          domain_remote_, &(send_buf.back().first));
+diff -uraN MUI-1.0/config.h v1.1_dev/config.h
+--- MUI-1.0/config.h	2020-01-31 11:48:46.000000000 +0000
++++ v1.1_dev/config.h	2020-10-27 15:26:55.000000000 +0000
+@@ -57,61 +57,70 @@
+ template<typename... TYPES> struct type_list {};
+ 
+ struct one_dim {
+-	static const int D = 1;
++	using EXCEPTION = exception_segv;		//- Exception handling type
+ 
+-	using REAL = double;
+-	using INT  = int;
+-	using point_type = point<REAL,D>;
+-	using time_type  = REAL; // INT-typed time stamp might be an alternative
+-	using data_types = type_list<int32_t,int64_t,double,float,std::string>;
+-
+-	static const bool DEBUG = false;
+-	using EXCEPTION = exception_segv;
+-
+-	static const bool FIXEDPOINTS = false;
++	static const bool DEBUG = false;		//- Enable extra debugging output
++	static const int D = 1;					//- Dimensionality of the domain
++	static const bool FIXEDPOINTS = false;	//- Enable optimisations for problems with fixed point structure
++	static const bool QUIET = false;		//- If the library is quiet then it will only issue critical warning messages
++
++	using REAL = double;					//- REAL data type
++	using INT  = int;						//- INT data type
++
++	using time_type  = REAL;				//- time_type INT for iteration coupling, REAL for exact coupling
++	using point_type = point<REAL,D>;		//- "point" data type and dimensionality
++	using data_types = type_list<int32_t,	//- Data types that can be used in the interface
++								 int64_t,
++								 double,
++								 float,
++								 std::string
++								>;
+ };
+ 
+ struct two_dim {
++	using EXCEPTION = exception_segv;
++
++	static const bool DEBUG = false;
+ 	static const int D = 2;
++	static const bool FIXEDPOINTS = false;
++	static const bool QUIET = false;
+ 
+ 	using REAL = double;
+ 	using INT  = int;
+-	using point_type = point<REAL,D>;
+-	using time_type  = REAL; // INT-typed time stamp might be an alternative
+-	using data_types = type_list<int32_t,int64_t,double,float,std::string>;
+ 
+-	static const bool DEBUG = false;
+-	using EXCEPTION = exception_segv;
+-
+-	static const bool FIXEDPOINTS = false;
++	using point_type = point<REAL,D>;
++	using time_type  = REAL;
++	using data_types = type_list<int32_t,
++								 int64_t,
++								 double,
++								 float,
++								 std::string
++								>;
+ };
+ 
+ struct three_dim {
++	using EXCEPTION = exception_segv;
++
++	static const bool DEBUG = false;
+ 	static const int D = 3;
++	static const bool FIXEDPOINTS = false;
++	static const bool QUIET = false;
+ 
+ 	using REAL = double;
+ 	using INT  = int;
+-	using point_type = point<REAL,D>;
+-	using time_type  = REAL; // INT-typed time stamp might be an alternative
+-	using data_types = type_list<int32_t,int64_t,double,float,std::string>;
+-
+-	static const bool DEBUG = false;
+-	using EXCEPTION = exception_segv;
+ 
+-	static const bool FIXEDPOINTS = false;
++	using point_type = point<REAL,D>;
++	using time_type  = REAL;
++	using data_types = type_list<int32_t,
++								 int64_t,
++								 double,
++								 float,
++								 std::string
++								>;
+ };
+ 
+ // backward-compatibility
+ struct default_config : three_dim {};
+-
+-/*
+- * user can define his own config like this:
+- * struct my_config: mui::crunch {
+- *   typedef unsigned int INT;
+- *
+- *   typedef std::array<REAL,D> point_type;
+- *  };
+- */
+ }
+ 
+ #endif
+
+diff -uraN MUI-1.0/endian_traits.h v1.1_dev/endian_traits.h
+--- MUI-1.0/endian_traits.h	2020-01-31 11:48:46.000000000 +0000
++++ v1.1_dev/endian_traits.h	2020-10-27 15:26:55.000000000 +0000
+@@ -2,7 +2,7 @@
+ * Multiscale Universal Interface Code Coupling Library                       *
+ *                                                                            *
+ * Copyright (C) 2019 Y. H. Tang, S. Kudo, X. Bian, Z. Li, G. E. Karniadakis, *
+-* R. W. Nash*                                                                *
++*                    R. W. Nash                                              *
+ *                                                                            *
+ * (* The University of Edinburgh)                                            *
+ *                                                                            *
+@@ -69,7 +69,7 @@
+  *
+  *      - MUI_FLOAT_BIG_ENDIAN - this will **assume** that the host has a big endian representation of floating values
+  *
+- *      - MUI_INT_LITTLE_ENDIAN - this will **assume** that the host has a little endian representation of floating values
++ *      - MUI_FLOAT_LITTLE_ENDIAN - this will **assume** that the host has a little endian representation of floating values
+  */
+ 
+ #ifndef MUI_ENDIAN_TRAITS_H_
+@@ -133,7 +133,7 @@
+ #      if defined(__BYTE_ORDER__)
+ #        define MUI_CONVERT_INT (__BYTE_ORDER__ != __ORDER_BIG_ENDIAN__)
+ #      else
+-#        error "MUI Error [endian_traits.h]: Cannot auto-detect integer endianness of platform - please set"
++#        error "MUI Error [endian_traits.h]: Cannot auto-detect integer endianness of platform - please set in compilation options (see endian_traits.h for details)"
+ #      endif
+ #    endif
+ #  endif
+@@ -141,7 +141,7 @@
+ // Floating points
+ #  ifdef MUI_FLOAT_BIG_ENDIAN
+ #    ifdef MUI_FLOAT_LITTLE_ENDIAN
+-#      error "MUI Error [endian_traits.h]: Both MUI_FLOAT_BIG_ENDIAN and MUI_FLOAT_LITTLE_ENDIAN defined!"
++#      error "MUI Error [endian_traits.h]: Both MUI_FLOAT_BIG_ENDIAN and MUI_FLOAT_LITTLE_ENDIAN defined"
+ #    else
+ #      define MUI_CONVERT_FLOAT false
+ #    endif
+@@ -153,7 +153,7 @@
+ #      if defined(__FLOAT_WORD_ORDER__)
+ #        define MUI_CONVERT_FLOAT (__FLOAT_WORD_ORDER__ != __ORDER_BIG_ENDIAN__)
+ #      else
+-#        error "MUI Error [endian_traits.h]: Cannot auto-detect float endianness of platform - please set"
++#        error "MUI Error [endian_traits.h]: Cannot auto-detect float endianness of platform - please set in compilation options (see endian_traits.h for details)"
+ #      endif
+ #    endif
+ #  endif
+diff -uraN MUI-1.0/geometry.h v1.1_dev/geometry.h
+--- MUI-1.0/geometry.h	2020-01-31 11:48:46.000000000 +0000
++++ v1.1_dev/geometry.h	2020-10-27 15:26:55.000000000 +0000
+@@ -372,7 +372,7 @@
+ template<typename CONFIG> bool collide( const box<CONFIG>& lhs, const box<CONFIG>& rhs)
+ {
+     for( uint i=0; i<CONFIG::D; ++i ) {
+-	  if( lhs.get_max()[i] < rhs.get_min()[i] || rhs.get_max()[i] < lhs.get_min()[i] ) return false;
++    	if( lhs.get_max()[i] < rhs.get_min()[i] || rhs.get_max()[i] < lhs.get_min()[i] ) return false;
+     }
+ 
+ 	return true;
+diff -uraN MUI-1.0/lib_mpi_multidomain.h v1.1_dev/lib_mpi_multidomain.h
+--- MUI-1.0/lib_mpi_multidomain.h	2020-01-31 11:48:46.000000000 +0000
++++ v1.1_dev/lib_mpi_multidomain.h	2021-02-15 21:29:12.532931000 +0000
+@@ -76,8 +76,8 @@
+     for( int i = 0; i < global_size; i++ ) {
+         if( global_rank == i ) {
+             for( auto &e : map ) {
+-            	std::cout << "> rank " << global_rank << " \"" << domain.c_str()
+-							<< "\" registered interface " << e.second.c_str()
++            	std::cout << "MUI [lib_mpi_multidomain]: Rank " << global_rank << " \"" << domain
++							<< "\" registered interface " << e.second
+ 							<< " as " << std::hex << e.first << std::dec << std::endl;
+             }
+         }
+@@ -96,7 +96,7 @@
+ 
+         for( auto &i : all_hashes ) unique_ifs.insert( i );
+         n_unique = unique_ifs.size();
+-        std::cout << "> " << n_unique << " distinct interfaces found" << std::endl;
++        std::cout << "MUI Info [lib_mpi_multidomain]: " << n_unique << " distinct interface(s) found" << std::endl;
+     } else {
+         gather( ( int )interfaces.size(), world );
+         MPI_Gatherv( my_hashes.data(), my_hashes.size(), MPI_INT, NULL, NULL, NULL, MPI_INT, 0, world );
+@@ -115,7 +115,7 @@
+             int comm_rank;
+             MPI_Comm_rank( comm_ifs, &comm_rank );
+             if( comm_rank == 0 ){
+-            	std::cout << "> setting up interface " << map[i].c_str() << " [" << std::hex << i
++            	std::cout << "MUI [lib_mpi_multidomain]: Setting up interface " << map[i] << " [" << std::hex << i
+             				<< std::dec << "] (rank ids are local to each interface)" << std::endl;
+             }
+             std::string full_uri( "mpi://" );
+diff -uraN MUI-1.0/mui-config.cmake v1.1_dev/mui-config.cmake
+--- MUI-1.0/mui-config.cmake	1970-01-01 01:00:00.000000000 +0100
++++ v1.1_dev/mui-config.cmake	2020-10-27 15:26:55.000000000 +0000
+@@ -0,0 +1,4 @@
++include(CMakeFindDependencyMacro) 
++find_dependency(Eigen3) 
++get_filename_component(SELF_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
++include("${SELF_DIR}/muiTargets.cmake")
+diff -uraN MUI-1.0/mui.h v1.1_dev/mui.h
+--- MUI-1.0/mui.h	2020-01-31 11:48:46.000000000 +0000
++++ v1.1_dev/mui.h	2020-10-27 15:26:55.000000000 +0000
+@@ -89,18 +89,22 @@
+ #ifdef USE_RBF
+ #define SPECIALIZE(SUFFIX,REALTYPE,INTTYPE,DIM) \
+ 		typedef struct config_##SUFFIX {\
++  	  	  	using EXCEPTION = exception_segv;\
++  	  	  	static const bool DEBUG = false;\
+ 			static const int D = DIM;\
++			static const bool FIXEDPOINTS = false;\
++			static const bool QUIET = false;\
+ 			using REAL = REALTYPE;\
+ 			using INT  = INTTYPE;\
+ 			using point_type = point<REAL,D>;\
+ 			using time_type  = REAL;\
+-			static const bool DEBUG = false;\
+ 			using data_types = type_list<int32_t,int64_t,double,float,std::string>;\
+-			using EXCEPTION = exception_segv;\
+-			static const bool FIXEDPOINTS = false;\
+ 		} mui_config_##SUFFIX;\
+ 		using uniface##SUFFIX = uniface<config_##SUFFIX>;\
+ 		using point##SUFFIX = point<config_##SUFFIX::REAL,config_##SUFFIX::D>;\
++		DECLARE_SAMPLER_1ARG(sampler_sum_quintic,SUFFIX,config_##SUFFIX)\
++		DECLARE_SAMPLER_1ARG(sampler_sph_quintic,SUFFIX,config_##SUFFIX)\
++		DECLARE_SAMPLER_1ARG(sampler_shepard_quintic,SUFFIX,config_##SUFFIX)\
+ 		DECLARE_SAMPLER_1ARG(sampler_nearest_neighbor,SUFFIX,config_##SUFFIX)\
+ 		DECLARE_SAMPLER_1ARG(sampler_pseudo_nearest_neighbor,SUFFIX,config_##SUFFIX)\
+ 		DECLARE_SAMPLER_1ARG(sampler_pseudo_nearest2_linear,SUFFIX,config_##SUFFIX)\
+@@ -137,18 +141,22 @@
+ #else
+ #define SPECIALIZE(SUFFIX,REALTYPE,INTTYPE,DIM) \
+ 		typedef struct config_##SUFFIX {\
+-			static const int D = DIM;\
+-			using REAL = REALTYPE;\
+-			using INT  = INTTYPE;\
+-			using point_type = point<REAL,D>;\
+-			using time_type  = REAL;\
+-			static const bool DEBUG = false;\
+-			using data_types = type_list<int32_t,int64_t,double,float,std::string>;\
+-			using EXCEPTION = exception_segv;\
+-			static const bool FIXEDPOINTS = false;\
++	  		using EXCEPTION = exception_segv;\
++	  		static const bool DEBUG = false;\
++	  		static const int D = DIM;\
++	  		static const bool FIXEDPOINTS = false;\
++	  		static const bool QUIET = false;\
++	  		using REAL = REALTYPE;\
++	  		using INT  = INTTYPE;\
++	  		using point_type = point<REAL,D>;\
++	  		using time_type  = REAL;\
++	  		using data_types = type_list<int32_t,int64_t,double,float,std::string>;\
+ 		} mui_config_##SUFFIX;\
+ 		using uniface##SUFFIX = uniface<config_##SUFFIX>;\
+ 		using point##SUFFIX = point<config_##SUFFIX::REAL,config_##SUFFIX::D>;\
++		DECLARE_SAMPLER_1ARG(sampler_sum_quintic,SUFFIX,config_##SUFFIX)\
++		DECLARE_SAMPLER_1ARG(sampler_sph_quintic,SUFFIX,config_##SUFFIX)\
++		DECLARE_SAMPLER_1ARG(sampler_shepard_quintic,SUFFIX,config_##SUFFIX)\
+ 		DECLARE_SAMPLER_1ARG(sampler_nearest_neighbor,SUFFIX,config_##SUFFIX)\
+ 		DECLARE_SAMPLER_1ARG(sampler_pseudo_nearest_neighbor,SUFFIX,config_##SUFFIX)\
+ 		DECLARE_SAMPLER_1ARG(sampler_pseudo_nearest2_linear,SUFFIX,config_##SUFFIX)\
+diff -uraN MUI-1.0/sourcelist.cmake v1.1_dev/sourcelist.cmake
+--- MUI-1.0/sourcelist.cmake	1970-01-01 01:00:00.000000000 +0100
++++ v1.1_dev/sourcelist.cmake	2020-10-27 15:26:55.000000000 +0000
+@@ -0,0 +1,54 @@
++set (mui_h 
++	bin.h
++	comm_factory.h
++	comm.h
++	comm_mpi.h
++	comm_mpi_nxn.h
++	comm_mpi_smart.h
++	comm_tcp.h
++	config.h
++	dim.h
++	dynstorage.h
++	exception.h
++	geometry.h
++	lib_dispatcher.h
++	lib_factory.h
++	lib_mpi_helper.h
++	lib_mpi_multidomain.h
++	lib_mpi_split.h
++	lib_singleton.h
++	lib_uri.h
++	message.h
++	mui.h
++	point.h
++	reader.h
++	reader_variable.h
++	sampler.h
++	span.h
++	spatial_storage.h
++	stream.h
++	stream_ordered.h
++	stream_string.h
++	stream_tuple.h
++	stream_unordered.h
++	stream_vector.h
++	uniface.h
++	util.h
++	virtual_container.h
++	spatial_samplers/sampler_exact.h
++	spatial_samplers/sampler_gauss.h
++	spatial_samplers/sampler_mov_avg.h
++	spatial_samplers/sampler_nn.h
++	spatial_samplers/sampler_null.h
++	spatial_samplers/sampler_pseudo_n2_linear.h
++	spatial_samplers/sampler_pseudo_nn.h
++	spatial_samplers/sampler_rbf.h
++	spatial_samplers/sampler_shepard_quintic.h
++	spatial_samplers/sampler_sph_quintic.h
++	spatial_samplers/sampler_sum_quintic.h
++	chrono_samplers/chrono_sampler_exact.h
++	chrono_samplers/chrono_sampler_gauss.h
++	chrono_samplers/chrono_sampler_mean.h
++	chrono_samplers/chrono_sampler_null.h
++	chrono_samplers/chrono_sampler_sum.h
++	)
+diff -uraN MUI-1.0/spatial_samplers/sampler_exact.h v1.1_dev/spatial_samplers/sampler_exact.h
+--- MUI-1.0/spatial_samplers/sampler_exact.h	2020-01-31 11:48:46.000000000 +0000
++++ v1.1_dev/spatial_samplers/sampler_exact.h	2021-02-15 21:29:12.533928700 +0000
+@@ -63,6 +63,8 @@
+ 	using INT        = typename CONFIG::INT;
+ 	using point_type = typename CONFIG::point_type;
+ 
++	static const bool QUIET = CONFIG::QUIET;
++
+ 	sampler_exact( REAL tol = std::numeric_limits<REAL>::epsilon() ) {
+ 	    INT exponent;
+ 		frexp10<REAL>( std::numeric_limits<REAL>::max(), exponent );
+@@ -79,7 +81,8 @@
+ 			}
+ 		}
+ 
+-		std::cerr << "MUI Warning [sampler_exact.h]: hit nothing" << std::endl;
++		if( !QUIET )
++			std::cout << "MUI Warning [sampler_exact.h]: Hit nothing, check sampling location..." << std::endl;
+ 
+ 		return OTYPE();
+ 	}
+diff -uraN MUI-1.0/spatial_samplers/sampler_rbf.h v1.1_dev/spatial_samplers/sampler_rbf.h
+--- MUI-1.0/spatial_samplers/sampler_rbf.h	2020-01-31 11:48:46.000000000 +0000
++++ v1.1_dev/spatial_samplers/sampler_rbf.h	2021-02-15 21:29:12.534925600 +0000
+@@ -51,6 +51,8 @@
+ #include "../util.h"
+ #include <Eigen/Sparse>
+ #include "../uniface.h"
++#include <iterator>
++#include <ctime>
+ 
+ namespace mui {
+ 
+@@ -65,17 +67,26 @@
+ 	using point_type = typename CONFIG::point_type;
+ 	using EXCEPTION  = typename CONFIG::EXCEPTION;
+ 
+-	sampler_rbf( REAL r, std::vector<point_type>& pts, bool conservative=false, double cutoff=1e-9, bool polynomial=false ) :
++	static const bool QUIET = CONFIG::QUIET;
++
++	sampler_rbf( REAL r, std::vector<point_type>& pts, bool conservative=false, double cutoff=1e-9, bool polynomial=false, const std::string& fileAddress=std::string(), bool readMatrix=false ) :
+ 	r_(r), 
+-	initialised_(false), 
++	initialised_(false),
++	CABrow_(0),
++	CABcol_(0),
++	Hrow_(0),
++	Hcol_(0),
+ 	conservative_(conservative), 
+ 	consistent_(!conservative),
+ 	polynomial_(polynomial),
++	readMatrix_(readMatrix),
++	fileAddress_(fileAddress),
+ 	N_sp_(50),
+ 	pts_(pts)
+ 	{
+ 		if( !CONFIG::FIXEDPOINTS ) {
+-			 EXCEPTION(std::runtime_error("Not (yet) implemented for dynamic points."));
++			//EXCEPTION(std::runtime_error("Not (yet) implemented for dynamic points."));
++			std::cerr << "MUI Warning [sampler_rbf.h]: RBF not (yet) implemented for dynamic points." << std::endl;
+ 		}
+ 
+ 		//set s to give rbf(r)=cutoff (default 1e-9)
+@@ -121,273 +132,241 @@
+ 	template<template<typename,typename> class CONTAINER>
+ 	void computeRBFtransformation( const CONTAINER<ITYPE,CONFIG> &data_points ) {
+ 
+-		buildConnectivity( data_points, N_sp_ );
+-		H_.resize( pts_.size(), data_points.size() );
+-
+-		if( consistent_ ) {
++        if (readMatrix_) {
+ 
+-            if (polynomial_){
++            std::ifstream inputFileMatrixSize(fileAddress_+"/matrixSize.dat");
+ 
+-                for( int row=0; row<pts_.size(); row++ ) {
++            if (!inputFileMatrixSize) {
++                std::cerr << "Could not locate the file address of matrixSize.dat!" << std::endl;
++            } else{
++				std::string tempS;
++				std::vector<INT> tempV;
++				while (std::getline(inputFileMatrixSize, tempS)) {
++					// Skips the line if the first two characters are '//'
++					if (tempS[0] == '/' && tempS[1] == '/') continue;
++					std::stringstream lineStream(tempS);
++                    std::string tempSS;
++					while(std::getline(lineStream, tempSS, ',')) {
++						tempV.push_back(std::stoi(tempSS));
++					}
++				}
++				CABrow_ = tempV[0];
++				CABcol_ = tempV[1];
++				Hrow_ = tempV[2];
++				Hcol_ = tempV[3];
+ 
+-                    Eigen::SparseMatrix<REAL> Css; //< Matrix of radial basis function evaluations between prescribed points
+-                    Eigen::SparseMatrix<REAL> Aas; //< Matrix of RBF evaluations between prescribed and interpolation points
+-
+-                    Css.resize((1+N_sp_+CONFIG::D), (1+N_sp_+CONFIG::D));
+-                    Aas.resize(1, (1+N_sp_+CONFIG::D));
+-
+-                    std::vector<Eigen::Triplet<REAL> > coefsC;
+-
+-                    //set Css
+-                    for( INT i=0 ; i < N_sp_ ; i++) {
+-                        for( INT j=i ; j < N_sp_ ; j++) {
+-                            int glob_i = connectivityAB_[row][i];
+-                            int glob_j = connectivityAB_[row][j];
+-
+-                            auto d = normsq( data_points[glob_i].first - data_points[glob_j].first );
++            }
+ 
+-                            if ( d < r_*r_ ) {
+-                                REAL w = rbf(d);
+-                                coefsC.push_back( Eigen::Triplet<REAL>(i, j, w ) );
++            std::ifstream inputFileCAB(fileAddress_+"/connectivityAB.dat");
+ 
+-                                if( i!=j ) {
+-                                    coefsC.push_back( Eigen::Triplet<REAL>( j, i, w ) );
+-                                }
+-                            }
++            if (!inputFileCAB) {
++                std::cerr << "Could not locate the file address on the connectivityAB.dat!" << std::endl;
++            } else{
++
++                connectivityAB_.resize(CABrow_);
++
++                for(int i=0; i<CABrow_; ++i){
++
++                    connectivityAB_[i].resize(CABcol_);
++                    std::string tempS;
++                    while (std::getline(inputFileCAB, tempS)) {
++						// Skips the line if the first two characters are '//'
++						if (tempS[0] == '/' && tempS[1] == '/') continue;
++						std::stringstream lineStream(tempS);
++						std::string tempSS;
++                        std::vector<INT> tempV;
++                        while(std::getline(lineStream, tempSS, ',')) {
++                            tempV.push_back(std::stoi(tempSS));
+                         }
++                        connectivityAB_.push_back(tempV);
+                     }
++                }
++            }
+ 
+-                    for( INT i=0; i < N_sp_; i++) {
+-                        coefsC.push_back( Eigen::Triplet<REAL>(i, N_sp_, 1 ) );
+-                        coefsC.push_back( Eigen::Triplet<REAL>(N_sp_, i, 1 ) );
++            H_.resize( Hrow_, Hcol_);
+ 
+-                        int glob_i = connectivityAB_[row][i];
++            std::ifstream inputFileHMatrix(fileAddress_+"/Hmatrix.dat");
+ 
+-                        for (int tempDim=0; tempDim < CONFIG::D; tempDim++){
+-                            coefsC.push_back(Eigen::Triplet<REAL>(i, (N_sp_+tempDim+1), data_points[glob_i].first[tempDim]));
+-                            coefsC.push_back(Eigen::Triplet<REAL>((N_sp_+tempDim+1), i, data_points[glob_i].first[tempDim]));
+-                        }
++            if (!inputFileHMatrix) {
++                std::cerr << "Could not locate the file address on the Hmatrix.dat!" << std::endl;
++            } else{
++                std::string tempS;
++                //std::vector<double> tempV;
++                int tempRow = 0;
++                int tempPoints = 0;
++                while (std::getline(inputFileHMatrix, tempS)){
++					// Skips the line if the first two characters are '//'
++					if (tempS[0] == '/' && tempS[1] == '/') continue;
++                    std::stringstream lineStream(tempS);
++                    std::string tempSS;
++                    int tempCol = 0;
++                    while (std::getline(lineStream, tempSS, ',')) {
++                        //tempV.push_back(std::stod(tempSS));
++                        H_(tempRow,tempCol) = std::stod(tempSS);
++                        ++tempCol;
++                        ++tempPoints;
+                     }
++                    ++tempRow;
++                }
+ 
+-                    Css.reserve(coefsC.size());
+-                    Css.setFromTriplets(coefsC.begin(), coefsC.end());
+-
+-                    //set Aas
+-                    std::vector<Eigen::Triplet<REAL> > coefs;
+-
+-                    for( INT j=0 ; j < N_sp_ ; j++) {
+-                        int glob_j = connectivityAB_[row][j];
++                if ((tempRow!=Hrow_) || ((tempPoints/tempRow)!=Hcol_)) {
++                    std::cerr << "tempRow (" << tempRow << ") does NOT equals to Hrow_ (" << Hrow_ << "), or" << std::endl
++                        <<"(tempPoints/tempRow) (" << (tempPoints/tempRow) << ") does NOT equals to Hcol_ (" << Hcol_ << ")"<< std::endl;
++                }
++                // else{
++                    //H_=Eigen::Map< Eigen::Matrix<REAL, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(tempV.data(), tempRow, tempV.size()/tempRow);
++               // }
++            }
+ 
+-                        auto d = normsq( pts_[row] - data_points[glob_j].first );
+ 
+-                        if ( d < r_*r_ ) {
+-                            coefs.push_back( Eigen::Triplet<REAL>(0, j, rbf(d) ) );
+-                        }
+-                    }
++        } else {
+ 
+-                    coefs.push_back( Eigen::Triplet<REAL>(0, N_sp_, 1 ) );
++            buildConnectivity( data_points, N_sp_ );
+ 
+-                    for (int tempDim=0; tempDim < CONFIG::D; tempDim++){
+-                        coefs.push_back(Eigen::Triplet<REAL>(0, (N_sp_+tempDim+1), pts_[row][tempDim]));
+-                    }
++            H_.resize( pts_.size(), data_points.size() );
+ 
+-                    Aas.reserve(coefs.size());
+-                    Aas.setFromTriplets(coefs.begin(), coefs.end());
++            std::ofstream outputFileMatrixSize(fileAddress_+"/matrixSize.dat");
+ 
+-                    //invert Css
+-                    Eigen::Matrix<REAL, Eigen::Dynamic, Eigen::Dynamic> I(Css.rows(), Css.cols());
+-                    I.setIdentity();
+-                    Eigen::ConjugateGradient<Eigen::SparseMatrix<REAL> > solver(Css);
+-                    solver.setTolerance(1e-6);
+-                    Eigen::SparseMatrix<REAL> invCss = (solver.solve(I)).sparseView(1e8);
++            if (!outputFileMatrixSize) {
++                std::cerr << "Could not locate the file address of matrixSize.dat!" << std::endl;
++            } else{
++                outputFileMatrixSize << "// *********************************************************************************************************************************************";
++                outputFileMatrixSize << "\n";
++                outputFileMatrixSize << "// **** This is the 'matrixSize.dat' file of the RBF spatial sampler of the MUI library";
++                outputFileMatrixSize << "\n";
++                outputFileMatrixSize << "// **** This file contains the size (number of rows and number of columns) of the Point Connectivity Matrix (N) and the Coupling Matrix (H).";
++                outputFileMatrixSize << "\n";
++                outputFileMatrixSize << "// **** The file uses the Comma-Separated Values (CSV) format and the ASCII format with the meanings as follows: ";
++                outputFileMatrixSize << "\n";
++                outputFileMatrixSize << "// ****			The number of rows of the Point Connectivity Matrix (N), ";
++                outputFileMatrixSize << "\n";
++                outputFileMatrixSize << "// ****			The number of columns of the Point Connectivity Matrix (N),";
++                outputFileMatrixSize << "\n";
++                outputFileMatrixSize << "// ****			The number of rows of the Coupling Matrix (H),";
++                outputFileMatrixSize << "\n";
++                outputFileMatrixSize << "// ****			The number of columns of the Coupling Matrix (H)";
++                outputFileMatrixSize << "\n";
++                outputFileMatrixSize << "// *********************************************************************************************************************************************";
++                outputFileMatrixSize << "\n";
++                outputFileMatrixSize << "//  ";
++                outputFileMatrixSize << "\n";
++                outputFileMatrixSize << connectivityAB_.size();
++                outputFileMatrixSize << ",";
++                outputFileMatrixSize << connectivityAB_[0].size();
++                outputFileMatrixSize << ",";
++                outputFileMatrixSize << H_.rows();
++                outputFileMatrixSize << ",";
++                outputFileMatrixSize << H_.cols();
++                outputFileMatrixSize << "\n";
++            }
++			const clock_t begin_time = clock();
++            if( consistent_ ) {
+ 
+-                    if( CONFIG::DEBUG ) {
+-                        std::cout << "#iterations of invCss:     " << solver.iterations() << ". Error of invCss: "<< solver.error()<< std::endl;
+-                    }
++                if (polynomial_){
+ 
+-                    Eigen::Matrix<REAL, Eigen::Dynamic, Eigen::Dynamic> H_i = (Aas * invCss).pruned(1e8);
++                    for( int row=0; row<pts_.size(); row++ ) {
+ 
+-                    for( INT j=0 ; j < N_sp_ ; j++) {
+-                        int glob_j = connectivityAB_[row][j];
+-                        H_(row, glob_j) = H_i(0,j);
+-                    }
+-                }
++                        Eigen::SparseMatrix<REAL> Css; //< Matrix of radial basis function evaluations between prescribed points
++                        Eigen::SparseMatrix<REAL> Aas; //< Matrix of RBF evaluations between prescribed and interpolation points
+ 
+-            } else{ // Without polynomial terms
++                        Css.resize((1+N_sp_+CONFIG::D), (1+N_sp_+CONFIG::D));
++                        Aas.resize(1, (1+N_sp_+CONFIG::D));
+ 
+-                for( int row=0; row<pts_.size(); row++ ) {
+-                    Eigen::SparseMatrix<REAL> AA; //< Matrix of radial basis function evaluations between prescribed points
+-                    Eigen::SparseMatrix<REAL> AB; //< Matrix of RBF evaluations between prescribed and interpolation points
++                        std::vector<Eigen::Triplet<REAL> > coefsC;
+ 
+-                    AA.resize( N_sp_, N_sp_ );
+-                    AB.resize( 1, N_sp_ );
++                        //set Css
++                        for( INT i=0 ; i < N_sp_ ; i++) {
++                            for( INT j=i ; j < N_sp_ ; j++) {
++                                int glob_i = connectivityAB_[row][i];
++                                int glob_j = connectivityAB_[row][j];
+ 
+-                    std::vector<Eigen::Triplet<REAL> > coefs;
++                                auto d = normsq( data_points[glob_i].first - data_points[glob_j].first );
+ 
+-                    //set AA
+-                    for( INT i=0 ; i < N_sp_ ; i++) {
+-                        for( INT j=i ; j < N_sp_ ; j++) {
+-                            int glob_i = connectivityAB_[row][i];
+-                            int glob_j = connectivityAB_[row][j];
++                                if ( d < r_*r_ ) {
++                                    REAL w = rbf(d);
++                                    coefsC.push_back( Eigen::Triplet<REAL>(i, j, w ) );
+ 
+-                            auto d = normsq( data_points[glob_i].first - data_points[glob_j].first );
+-                            if ( d < r_*r_ ) {
+-                                REAL w = rbf(d);
+-                                coefs.push_back( Eigen::Triplet<REAL>(i, j , w ) );
+-                                if( i!=j ) {
+-                                    coefs.push_back( Eigen::Triplet<REAL>( j, i, w ) );
++                                    if( i!=j ) {
++                                        coefsC.push_back( Eigen::Triplet<REAL>( j, i, w ) );
++                                    }
+                                 }
+                             }
+                         }
+-                    }
+ 
+-                    AA.reserve(coefs.size());
+-                    AA.setFromTriplets(coefs.begin(), coefs.end());
++                        for( INT i=0; i < N_sp_; i++) {
++                            coefsC.push_back( Eigen::Triplet<REAL>(i, N_sp_, 1 ) );
++                            coefsC.push_back( Eigen::Triplet<REAL>(N_sp_, i, 1 ) );
+ 
+-                    //set AB
+-                    coefs.clear();
+-                    for( INT j=0 ; j < N_sp_ ; j++) {
+-                        int glob_j = connectivityAB_[row][j];
++                            int glob_i = connectivityAB_[row][i];
+ 
+-                        auto d = normsq( pts_[row] - data_points[glob_j].first );
+-                        if ( d < r_*r_ ) {
+-                            coefs.push_back( Eigen::Triplet<REAL>(0, j, rbf(d) ) );
++                            for (int tempDim=0; tempDim < CONFIG::D; tempDim++){
++                                coefsC.push_back(Eigen::Triplet<REAL>(i, (N_sp_+tempDim+1), data_points[glob_i].first[tempDim]));
++                                coefsC.push_back(Eigen::Triplet<REAL>((N_sp_+tempDim+1), i, data_points[glob_i].first[tempDim]));
++                            }
+                         }
+-                    }
+-
+-                    AB.reserve(coefs.size());
+-                    AB.setFromTriplets(coefs.begin(), coefs.end());
+-
+-                    //invert AA
+-                    Eigen::Matrix<REAL, Eigen::Dynamic, Eigen::Dynamic> I(AA.rows(), AA.cols());
+-                    I.setIdentity();
+-                    Eigen::ConjugateGradient<Eigen::SparseMatrix<REAL> > solver(AA);
+-                    solver.setTolerance(1e-6);
+-                    Eigen::SparseMatrix<REAL> invAA = (solver.solve(I)).sparseView(1e8);
+-
+-                    if( CONFIG::DEBUG ) {
+-                        std::cout << "#iterations:     " << solver.iterations() << ". Error: "<< solver.error()<< std::endl;
+-                    }
+ 
+-                    Eigen::Matrix<REAL, Eigen::Dynamic, Eigen::Dynamic> H_i = (AB * invAA).pruned(1e8);
++                        Css.reserve(coefsC.size());
++                        Css.setFromTriplets(coefsC.begin(), coefsC.end());
+ 
+-                    for( INT j=0 ; j < N_sp_ ; j++) {
+-                        int glob_j = connectivityAB_[row][j];
+-                        H_(row, glob_j) = H_i(0,j);
+-                    }
+-                }
+-            }
+-        }else { //conservative
+-
+-            if (polynomial_){
+-
+-                Eigen::SparseMatrix<REAL> Css; //< Matrix of radial basis function evaluations between prescribed points
+-                Eigen::SparseMatrix<REAL> Aas; //< Matrix of RBF evaluations between prescribed and interpolation points
+-
+-                Css.resize((1+pts_.size()+CONFIG::D), (1+pts_.size()+CONFIG::D));
+-                Aas.resize((data_points.size()), (1+pts_.size()+CONFIG::D));
+-
+-                std::vector<Eigen::Triplet<REAL> > coefsC;
++                        //set Aas
++                        std::vector<Eigen::Triplet<REAL> > coefs;
+ 
+-                //set Css
+-                for( INT i=0 ; i < pts_.size() ; i++) {
+-                    for( INT j=i ; j < pts_.size() ; j++) {
++                        for( INT j=0 ; j < N_sp_ ; j++) {
++                            int glob_j = connectivityAB_[row][j];
+ 
+-                        auto d = normsq( pts_[i] - pts_[j] );
+-                        
+-                        if ( d < r_*r_ ) {
+-                            REAL w = rbf(d);
+-                            coefsC.push_back( Eigen::Triplet<REAL>((i+CONFIG::D+1), (j+CONFIG::D+1), w ) );
++                            auto d = normsq( pts_[row] - data_points[glob_j].first );
+ 
+-                            if( i!=j ) {
+-                                coefsC.push_back( Eigen::Triplet<REAL>( (j+CONFIG::D+1), (i+CONFIG::D+1), w ) );
++                            if ( d < r_*r_ ) {
++                                coefs.push_back( Eigen::Triplet<REAL>(0, j, rbf(d) ) );
+                             }
+                         }
+-                    }
+-                }
+- 
+-/*                 for( INT j=0; j < pts_.size(); j++) {
+-                    coefsC.push_back( Eigen::Triplet<REAL>(0, (j+CONFIG::D+1), 1 ) );
+-                    coefsC.push_back( Eigen::Triplet<REAL>((j+CONFIG::D+1), 0, 1 ) );
+-                    
+-                    for (int tempDim=0; tempDim < CONFIG::D; tempDim++){
+-                        coefsC.push_back(Eigen::Triplet<REAL>((tempDim+1), (j+CONFIG::D+1), pts_[j][tempDim]));
+-                        coefsC.push_back(Eigen::Triplet<REAL>((j+CONFIG::D+1), (tempDim+1), pts_[j][tempDim]));
+-                    }
+-                } */
+-
+-                Css.reserve(coefsC.size());
+-                Css.setFromTriplets(coefsC.begin(), coefsC.end());
+ 
+-                //set Aas
+-                std::vector<Eigen::Triplet<REAL> > coefs;
+-
+-                for( INT i=0 ; i < data_points.size() ; i++) {
+-                    for( INT j=0 ; j < pts_.size() ; j++) {
+-
+-                        auto d = normsq( data_points[i].first - pts_[j] );
++                        coefs.push_back( Eigen::Triplet<REAL>(0, N_sp_, 1 ) );
+ 
+-                        if ( d < r_*r_ ) {
+-                            coefs.push_back( Eigen::Triplet<REAL>(i, (j+CONFIG::D+1), rbf(d) ) );
++                        for (int tempDim=0; tempDim < CONFIG::D; tempDim++){
++                            coefs.push_back(Eigen::Triplet<REAL>(0, (N_sp_+tempDim+1), pts_[row][tempDim]));
+                         }
+-                    }
+-                }
+ 
+-/*                  for( INT i=0 ; i < data_points.size() ; i++) {
+-
+-                    coefs.push_back( Eigen::Triplet<REAL>(i, 0, 1 ) );
+-                    for (int tempDim=0; tempDim < CONFIG::D; tempDim++){
+-                        coefs.push_back(Eigen::Triplet<REAL>(i, (tempDim+1), data_points[i].first[tempDim]));
+-                    }
+-                }
+- */
+-                Aas.reserve(coefs.size());
+-                Aas.setFromTriplets(coefs.begin(), coefs.end());
+-
+-                //invert Css
+-                Eigen::Matrix<REAL, Eigen::Dynamic, Eigen::Dynamic> I(Css.rows(), Css.cols());
+-                I.setIdentity();
+-                Eigen::ConjugateGradient<Eigen::SparseMatrix<REAL> > solver(Css);
+-                solver.setTolerance(1e-4);
+-                Eigen::SparseMatrix<REAL> invCss = (solver.solve(I)).sparseView(1e8);
++                        Aas.reserve(coefs.size());
++                        Aas.setFromTriplets(coefs.begin(), coefs.end());
+ 
+-                if( CONFIG::DEBUG ) {
+-                    std::cout << "#iterations of invCss:     " << solver.iterations() << ". Error of invCss: "<< solver.error()<< std::endl;
+-                }
++                        //invert Css
++                        Eigen::Matrix<REAL, Eigen::Dynamic, Eigen::Dynamic> I(Css.rows(), Css.cols());
++                        I.setIdentity();
++                        Eigen::ConjugateGradient<Eigen::SparseMatrix<REAL> > solver(Css);
++                        solver.setTolerance(1e-6);
++                        Eigen::SparseMatrix<REAL> invCss = (solver.solve(I)).sparseView(1e8);
+ 
++                        if( CONFIG::DEBUG ) {
++                            std::cout << "#iterations of invCss:     " << solver.iterations() << ". Error of invCss: "<< solver.error()<< std::endl;
++                        }
+ 
+-                Eigen::SparseMatrix<REAL> AasTrans = Aas.transpose();
++                        Eigen::Matrix<REAL, Eigen::Dynamic, Eigen::Dynamic> H_i = (Aas * invCss).pruned(1e8);
+ 
+-                Eigen::Matrix<REAL, Eigen::Dynamic, Eigen::Dynamic> H_more = (invCss * AasTrans).pruned(1e8);
+-                int r = H_more.rows();
+-                int c = H_more.cols();
+-
+-                for( INT i=0 ; i < pts_.size() ; i++) {
+-                    for( INT j=0 ; j < data_points.size() ; j++) {
+-                        H_(i, j) = H_more((i+CONFIG::D+1),j);
++                        for( INT j=0 ; j < N_sp_ ; j++) {
++                            int glob_j = connectivityAB_[row][j];
++                            H_(row, glob_j) = H_i(0,j);
++                        }
+                     }
+-                }
+ 
+-            } else{ // Without polynomial terms
++                } else{ // Without polynomial terms
+ 
+-                for( int row=0; row<pts_.size(); row++ ) {
+-                    for( int row=0; row<data_points.size(); row++ ) {
++                    for( int row=0; row<pts_.size(); row++ ) {
+                         Eigen::SparseMatrix<REAL> AA; //< Matrix of radial basis function evaluations between prescribed points
+                         Eigen::SparseMatrix<REAL> AB; //< Matrix of RBF evaluations between prescribed and interpolation points
+ 
+-                        AA.resize( pts_.size(), pts_.size() );
+-                        AB.resize( 1, pts_.size() );
++                        AA.resize( N_sp_, N_sp_ );
++                        AB.resize( 1, N_sp_ );
+ 
+                         std::vector<Eigen::Triplet<REAL> > coefs;
+ 
+                         //set AA
+-                        for( INT i=0 ; i < pts_.size() ; i++) {
+-                            for( INT j=i ; j < pts_.size() ; j++) {
+-
++                        for( INT i=0 ; i < N_sp_ ; i++) {
++                            for( INT j=i ; j < N_sp_ ; j++) {
+                                 int glob_i = connectivityAB_[row][i];
+                                 int glob_j = connectivityAB_[row][j];
+ 
+-                                auto d = normsq( pts_[glob_i] - pts_[glob_j] );
++                                auto d = normsq( data_points[glob_i].first - data_points[glob_j].first );
+                                 if ( d < r_*r_ ) {
+                                     REAL w = rbf(d);
+                                     coefs.push_back( Eigen::Triplet<REAL>(i, j , w ) );
+@@ -403,13 +382,13 @@
+ 
+                         //set AB
+                         coefs.clear();
+-                        for( INT j=0 ; j < pts_.size() ; j++) {
++                        for( INT j=0 ; j < N_sp_ ; j++) {
+                             int glob_j = connectivityAB_[row][j];
+ 
+-                            auto d = normsq( data_points[row].first - pts_[glob_j] );
++                            auto d = normsq( pts_[row] - data_points[glob_j].first );
+                             if ( d < r_*r_ ) {
+-                                    coefs.push_back( Eigen::Triplet<REAL>(0, j, rbf(d) ) );
+-                                }
++                                coefs.push_back( Eigen::Triplet<REAL>(0, j, rbf(d) ) );
++                            }
+                         }
+ 
+                         AB.reserve(coefs.size());
+@@ -423,22 +402,204 @@
+                         Eigen::SparseMatrix<REAL> invAA = (solver.solve(I)).sparseView(1e8);
+ 
+                         if( CONFIG::DEBUG ) {
+-                            std::cout << "#iterations:     " << solver.iterations() << ". Error: "<< solver.error()<< std::endl;
++                        	std::cout << "MUI [sampler_rbf.h]: invCss iteration count: " << solver.iterations()
++									  << "                          invCss error: " << solver.error() << std::endl;
+                         }
+ 
+-                        Eigen::SparseMatrix<REAL> ABTrans = AB.transpose();
++                        Eigen::Matrix<REAL, Eigen::Dynamic, Eigen::Dynamic> H_i = (AB * invAA).pruned(1e8);
+ 
+-                        Eigen::Matrix<REAL, Eigen::Dynamic, Eigen::Dynamic> H_j = (invAA * ABTrans).pruned(1e8);
++                        for( INT j=0 ; j < N_sp_ ; j++) {
++                            int glob_j = connectivityAB_[row][j];
++                            H_(row, glob_j) = H_i(0,j);
++                        }
++                    }
++                }
++            }else { //conservative
+ 
+-                        for( INT i=0 ; i < pts_.size() ; i++) {
+-                            int glob_i = connectivityAB_[row][i];
+-                            H_(glob_i, row) = H_j(i,0);
++                if (polynomial_){
++
++                    Eigen::SparseMatrix<REAL> Css; //< Matrix of radial basis function evaluations between prescribed points
++                    Eigen::SparseMatrix<REAL> Aas; //< Matrix of RBF evaluations between prescribed and interpolation points
++
++                    Css.resize((1+pts_.size()+CONFIG::D), (1+pts_.size()+CONFIG::D));
++                    Aas.resize((data_points.size()), (1+pts_.size()+CONFIG::D));
++
++                    std::vector<Eigen::Triplet<REAL> > coefsC;
++
++                    //set Css
++                    for( INT i=0 ; i < pts_.size() ; i++) {
++                        for( INT j=i ; j < pts_.size() ; j++) {
++
++                            auto d = normsq( pts_[i] - pts_[j] );
++
++                            if ( d < r_*r_ ) {
++                                REAL w = rbf(d);
++                                coefsC.push_back( Eigen::Triplet<REAL>((i+CONFIG::D+1), (j+CONFIG::D+1), w ) );
++
++                                if( i!=j ) {
++                                    coefsC.push_back( Eigen::Triplet<REAL>( (j+CONFIG::D+1), (i+CONFIG::D+1), w ) );
++                                }
++                            }
++                        }
++                    }
++
++    /*                 for( INT j=0; j < pts_.size(); j++) {
++                        coefsC.push_back( Eigen::Triplet<REAL>(0, (j+CONFIG::D+1), 1 ) );
++                        coefsC.push_back( Eigen::Triplet<REAL>((j+CONFIG::D+1), 0, 1 ) );
++
++                        for (int tempDim=0; tempDim < CONFIG::D; tempDim++){
++                            coefsC.push_back(Eigen::Triplet<REAL>((tempDim+1), (j+CONFIG::D+1), pts_[j][tempDim]));
++                            coefsC.push_back(Eigen::Triplet<REAL>((j+CONFIG::D+1), (tempDim+1), pts_[j][tempDim]));
++                        }
++                    } */
++
++                    Css.reserve(coefsC.size());
++                    Css.setFromTriplets(coefsC.begin(), coefsC.end());
++
++                    //set Aas
++                    std::vector<Eigen::Triplet<REAL> > coefs;
++
++                    for( INT i=0 ; i < data_points.size() ; i++) {
++                        for( INT j=0 ; j < pts_.size() ; j++) {
++
++                            auto d = normsq( data_points[i].first - pts_[j] );
++
++                            if ( d < r_*r_ ) {
++                                coefs.push_back( Eigen::Triplet<REAL>(i, (j+CONFIG::D+1), rbf(d) ) );
++                            }
++                        }
++                    }
++
++    /*                  for( INT i=0 ; i < data_points.size() ; i++) {
++
++                        coefs.push_back( Eigen::Triplet<REAL>(i, 0, 1 ) );
++                        for (int tempDim=0; tempDim < CONFIG::D; tempDim++){
++                            coefs.push_back(Eigen::Triplet<REAL>(i, (tempDim+1), data_points[i].first[tempDim]));
++                        }
++                    }
++     */
++                    Aas.reserve(coefs.size());
++                    Aas.setFromTriplets(coefs.begin(), coefs.end());
++
++                    //invert Css
++                    Eigen::Matrix<REAL, Eigen::Dynamic, Eigen::Dynamic> I(Css.rows(), Css.cols());
++                    I.setIdentity();
++                    Eigen::ConjugateGradient<Eigen::SparseMatrix<REAL> > solver(Css);
++                    solver.setTolerance(1e-4);
++                    Eigen::SparseMatrix<REAL> invCss = (solver.solve(I)).sparseView(1e8);
++
++                    if( CONFIG::DEBUG ) {
++                        std::cout << "#iterations of invCss:     " << solver.iterations() << ". Error of invCss: "<< solver.error()<< std::endl;
++                    }
++
++
++                    Eigen::SparseMatrix<REAL> AasTrans = Aas.transpose();
++
++                    Eigen::Matrix<REAL, Eigen::Dynamic, Eigen::Dynamic> H_more = (invCss * AasTrans).pruned(1e8);
++                    int r = H_more.rows();
++                    int c = H_more.cols();
++
++                    for( INT i=0 ; i < pts_.size() ; i++) {
++                        for( INT j=0 ; j < data_points.size() ; j++) {
++                            H_(i, j) = H_more((i+CONFIG::D+1),j);
++                        }
++                    }
++
++                } else{ // Without polynomial terms
++
++                    for( int row=0; row<pts_.size(); row++ ) {
++                        for( int row=0; row<data_points.size(); row++ ) {
++                            Eigen::SparseMatrix<REAL> AA; //< Matrix of radial basis function evaluations between prescribed points
++                            Eigen::SparseMatrix<REAL> AB; //< Matrix of RBF evaluations between prescribed and interpolation points
++
++                            AA.resize( pts_.size(), pts_.size() );
++                            AB.resize( 1, pts_.size() );
++
++                            std::vector<Eigen::Triplet<REAL> > coefs;
++
++                            //set AA
++                            for( INT i=0 ; i < pts_.size() ; i++) {
++                                for( INT j=i ; j < pts_.size() ; j++) {
++
++                                    int glob_i = connectivityAB_[row][i];
++                                    int glob_j = connectivityAB_[row][j];
++
++                                    auto d = normsq( pts_[glob_i] - pts_[glob_j] );
++                                    if ( d < r_*r_ ) {
++                                        REAL w = rbf(d);
++                                        coefs.push_back( Eigen::Triplet<REAL>(i, j , w ) );
++                                        if( i!=j ) {
++                                            coefs.push_back( Eigen::Triplet<REAL>( j, i, w ) );
++                                        }
++                                    }
++                                }
++                            }
++
++                            AA.reserve(coefs.size());
++                            AA.setFromTriplets(coefs.begin(), coefs.end());
++
++                            //set AB
++                            coefs.clear();
++                            for( INT j=0 ; j < pts_.size() ; j++) {
++                                int glob_j = connectivityAB_[row][j];
++
++                                auto d = normsq( data_points[row].first - pts_[glob_j] );
++                                if ( d < r_*r_ ) {
++                                        coefs.push_back( Eigen::Triplet<REAL>(0, j, rbf(d) ) );
++                                    }
++                            }
++
++                            AB.reserve(coefs.size());
++                            AB.setFromTriplets(coefs.begin(), coefs.end());
++
++                            //invert AA
++                            Eigen::Matrix<REAL, Eigen::Dynamic, Eigen::Dynamic> I(AA.rows(), AA.cols());
++                            I.setIdentity();
++                            Eigen::ConjugateGradient<Eigen::SparseMatrix<REAL> > solver(AA);
++                            solver.setTolerance(1e-6);
++                            Eigen::SparseMatrix<REAL> invAA = (solver.solve(I)).sparseView(1e8);
++
++                            if( CONFIG::DEBUG ) {
++                                std::cout << "#iterations:     " << solver.iterations() << ". Error: "<< solver.error()<< std::endl;
++                            }
++
++                            Eigen::SparseMatrix<REAL> ABTrans = AB.transpose();
++
++                            Eigen::Matrix<REAL, Eigen::Dynamic, Eigen::Dynamic> H_j = (invAA * ABTrans).pruned(1e8);
++
++                            for( INT i=0 ; i < pts_.size() ; i++) {
++                                int glob_i = connectivityAB_[row][i];
++                                H_(glob_i, row) = H_j(i,0);
++                            }
+                         }
+                     }
+                 }
+             }
+-        }
++			if( CONFIG::DEBUG ) {
++				std::cout << "run time [s]: " << float( clock () - begin_time )/  CLOCKS_PER_SEC << std::endl;
++            }
++			const static Eigen::IOFormat CSVFormat(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", "\n");
+ 
++            std::ofstream outputFileHMatrix(fileAddress_+"/Hmatrix.dat");
++
++            if (!outputFileHMatrix) {
++                std::cerr << "Could not locate the file address of Hmatrix.dat!" << std::endl;
++            } else{
++				outputFileHMatrix << "// ************************************************************************************************";
++                outputFileHMatrix << "\n";
++				outputFileHMatrix << "// **** This is the 'Hmatrix.dat' file of the RBF spatial sampler of the MUI library";
++                outputFileHMatrix << "\n";
++                outputFileHMatrix << "// **** This file contains the entire matrix of the Coupling Matrix (H).";
++                outputFileHMatrix << "\n";
++                outputFileHMatrix << "// **** The file uses the Comma-Separated Values (CSV) format with ASCII for the entire H matrix";
++                outputFileHMatrix << "\n";
++                outputFileHMatrix << "// ************************************************************************************************";
++                outputFileHMatrix << "\n";
++                outputFileHMatrix << "// ";
++                outputFileHMatrix << "\n";
++                outputFileHMatrix << H_.format(CSVFormat);
++            }
++        }
+ 		initialised_ = true;
+ 	}
+ 
+@@ -459,6 +620,26 @@
+         bool warningSent = false;
+         int  pointsCount = 0;
+ 
++
++		std::ofstream outputFileCAB(fileAddress_+"/connectivityAB.dat");
++
++		if (!outputFileCAB) {
++			std::cerr << "Could not locate the file address on the connectivityAB.dat!" << std::endl;
++		} else {
++			outputFileCAB << "// ************************************************************************************************";
++			outputFileCAB << "\n";
++			outputFileCAB << "// **** This is the 'connectivityAB.dat' file of the RBF spatial sampler of the MUI library";
++			outputFileCAB << "\n";
++			outputFileCAB << "// **** This file contains the entire matrix of the Point Connectivity Matrix (N).";
++			outputFileCAB << "\n";
++			outputFileCAB << "// **** The file uses the Comma-Separated Values (CSV) format with ASCII for the entire N matrix";
++			outputFileCAB << "\n";
++			outputFileCAB << "// ************************************************************************************************";
++			outputFileCAB << "\n";
++			outputFileCAB << "// ";
++			outputFileCAB << "\n";
++		}
++
+         if( consistent_ ) {
+ 
+             connectivityAB_.resize(pts_.size());
+@@ -497,12 +678,16 @@
+ 
+                     connectivityAB_[i].push_back(bestj);
+ 
++					outputFileCAB << bestj << ",";
++
+                     if ((!warningSent) && (pointsCount > 120) && (n ==0)) {
+-                        std::cerr << "MUI Warning [sampler_rbf.h]: RBF search radius too large." << pointsCount << std::endl;
++                        if( !QUIET )
++                        	std::cout << "MUI Warning [sampler_rbf.h]: RBF search radius too large (No. points found " << pointsCount << ")" << std::endl;
+                         warningSent = true;
+                     }
+ 
+                 }
++				outputFileCAB << '\n';
+             }
+         } else{ //conservative
+ 
+@@ -542,14 +727,18 @@
+ 
+                     connectivityAB_[i].push_back(bestj);
+ 
++					outputFileCAB << bestj << ",";
++
+                     if ((!warningSent) && (pointsCount > 120) && (n ==0)) {
+-                        std::cerr << "MUI Warning [sampler_rbf.h]: RBF search radius too large." << std::endl;
++                    	if( !QUIET )
++                    		std::cout << "MUI Warning [sampler_rbf.h]: RBF search radius too large (No. points found " << pointsCount << ")" << std::endl;
+                         warningSent = true;
+                     }
+                 }
++				outputFileCAB << '\n';
+             }
+         }
+-
++		outputFileCAB.close();
+ 		return;
+ 	}
+ 
+@@ -558,10 +747,16 @@
+ 	REAL s_;
+ 
+ 	bool initialised_;
++    INT CABrow_;
++	INT CABcol_;
++	INT Hrow_;
++	INT Hcol_;
+ 	const bool conservative_;
+ 	const bool consistent_;
+ 	const bool polynomial_;
+-	
++    const bool readMatrix_;
++	const std::string fileAddress_;
++
+ 	INT N_sp_;
+ 	
+ 	std::vector<point_type> pts_;
+diff -uraN MUI-1.0/uniface.h v1.1_dev/uniface.h
+--- MUI-1.0/uniface.h	2020-01-31 11:48:46.000000000 +0000
++++ v1.1_dev/uniface.h	2021-02-15 21:29:12.536919600 +0000
+@@ -1,7 +1,8 @@
+ /*****************************************************************************
+ * Multiscale Universal Interface Code Coupling Library                       *
+ *                                                                            *
+-* Copyright (C) 2019 Y. H. Tang, S. Kudo, X. Bian, Z. Li, G. E. Karniadakis  *
++* Copyright (C) 2019 Y. H. Tang, S. Kudo, X. Bian, Z. Li, G. E. Karniadakis, *
++*                    S. M. Longshaw, A. Skillen                              *
+ *                                                                            *
+ * This software is jointly licensed under the Apache License, Version 2.0    *
+ * and the GNU General Public License version 3, you may use it according     *
+@@ -78,15 +79,15 @@
+ template<typename CONFIG = default_config>
+ class uniface {
+ public:
+-	// public typedefs.
+-	static const int  D     = CONFIG::D; //!< dimensionality of the domains
+-	static const bool DEBUG = CONFIG::DEBUG;
++	// public typedefs (see config.h for descriptions)
++	static const int  D     = CONFIG::D;
+ 	static const bool FIXEDPOINTS = CONFIG::FIXEDPOINTS;
+-	using REAL       = typename CONFIG::REAL;
++	static const bool QUIET = CONFIG::QUIET;
++
++	using REAL = typename CONFIG::REAL;
+ 	using point_type = typename CONFIG::point_type;
+ 	using time_type  = typename CONFIG::time_type;
+ 	using data_types = typename CONFIG::data_types;
+-
+ 	using span_t = geometry::any_shape<CONFIG>;
+ private:
+ 	// meta functions to split tuple and add vector<pair<point_type,_1> >
+@@ -127,16 +128,16 @@
+ 			return scan_spans_(t,s,recving_spans);
+ 		}
+ 		
+-		void set_recving( time_type start, time_type timeout, span_t s ) {
+-			recving_spans.emplace(std::make_pair(start,timeout),std::move(s));
++		void set_recving( time_type start, time_type end, span_t s ) {
++			recving_spans.emplace(std::make_pair(start,end),std::move(s));
+ 		}
+ 		
+ 		bool is_sending(time_type t, const span_t& s) const {
+ 			return scan_spans_(t,s,sending_spans);
+ 		}
+ 		
+-		void set_sending(time_type start, time_type timeout, span_t s) {
+-			sending_spans.emplace(std::make_pair(start,timeout), std::move(s));
++		void set_sending(time_type start, time_type end, span_t s) {
++			sending_spans.emplace(std::make_pair(start,end), std::move(s));
+ 		}
+ 
+ 		void set_pts(std::vector<point_type> pts) {
+@@ -164,19 +165,24 @@
+ 		}
+ 
+ 		time_type current_t() const { return latest_timestamp; }
++		time_type current_sub() const { return latest_subiter; }
+ 		time_type next_t() const { return next_timestamp; }
++		time_type next_sub() const { return next_subiter; }
+ 		void set_current_t( time_type t ) { latest_timestamp = t; }
++		void set_current_sub( time_type t ) { latest_subiter = t; }
+ 		void set_next_t( time_type t ) { next_timestamp = t; }
++		void set_next_sub( time_type t ) { next_subiter = t; }
+ 	private:
+ 		bool scan_spans_(time_type t, const span_t& s, const spans_type& spans ) const {
+-			auto p = std::make_pair(t+threshold(t),t+threshold(t));
+-			auto end = spans.upper_bound(p);
+ 			bool prefetched = false;
++			auto end = spans.end();
++			if(spans.size() > 1)
++				end = spans.lower_bound(std::make_pair(t,t));
+ 
+ 			for( auto itr = spans.begin(); itr != end; ++itr ) {
+ 			    if( (t < itr->first.second) || almost_equal(t, itr->first.second) ) {
+ 					prefetched = true;
+-					if( collide(s,itr->second) )  return true;
++					if( collide(s,itr->second) ) return true;
+ 				}
+ 			}
+ 			// if prefetched at t, but no overlap region, then return false;
+@@ -184,7 +190,9 @@
+ 			return !prefetched;
+ 		}
+ 		time_type latest_timestamp = std::numeric_limits<time_type>::lowest();
++		time_type latest_subiter = std::numeric_limits<time_type>::lowest();
+ 		time_type next_timestamp = std::numeric_limits<time_type>::lowest();
++		time_type next_subiter = std::numeric_limits<time_type>::lowest();
+ 		spans_type recving_spans;
+ 		spans_type sending_spans;
+ 		std::vector<point_type> pts_;
+@@ -197,7 +205,7 @@
+ 	std::unique_ptr<communicator> comm;
+ 	dispatcher<message::id_type, std::function<void(message)> > readers;
+ 
+-	std::map<time_type,bin_frame_type> log;
++	std::map<std::pair<time_type, time_type>, bin_frame_type> log;
+ 
+ 	frame_type push_buffer;
+ 	frame_raw_type push_buffer_raw;
+@@ -206,10 +214,10 @@
+ 	std::unordered_map<std::string, storage_single_t > assigned_values;
+ 
+ 	std::vector<peer_state> peers;
+-	time_type span_start   = std::numeric_limits<time_type>::lowest();
++	time_type span_start = std::numeric_limits<time_type>::lowest();
+ 	time_type span_timeout = std::numeric_limits<time_type>::lowest();
+ 	span_t current_span;
+-	time_type recv_start   = std::numeric_limits<time_type>::lowest();
++	time_type recv_start = std::numeric_limits<time_type>::lowest();
+ 	time_type recv_timeout = std::numeric_limits<time_type>::lowest();
+ 	span_t recv_span;
+ 	time_type memory_length = std::numeric_limits<time_type>::max();
+@@ -223,32 +231,32 @@
+ 		using namespace std::placeholders;
+ 
+ 		peers.resize(comm->remote_size());
+-		readers.link("timestamp", reader_variables<int32_t, time_type>(
+-		             std::bind(&uniface::on_recv_confirm, this, _1, _2)));
+-		readers.link("forecast", reader_variables<int32_t, time_type>(
+-		             std::bind(&uniface::on_recv_forecast, this, _1, _2)));
+-		readers.link("receiving span", reader_variables<int32_t, time_type, time_type, span_t>(
++
++		readers.link("timestamp", reader_variables<int32_t, std::pair<time_type,time_type> >(
++					 std::bind(&uniface::on_recv_confirm, this, _1, _2)));
++		readers.link("forecast", reader_variables<int32_t, std::pair<time_type,time_type>>(
++					 std::bind(&uniface::on_recv_forecast, this, _1, _2)));
++		readers.link("data", reader_variables<std::pair<time_type,time_type>, frame_type>(
++					 std::bind(&uniface::on_recv_data, this, _1, _2)));
++		readers.link("rawdata", reader_variables<int32_t, std::pair<time_type,time_type>, frame_raw_type>(
++					 std::bind(&uniface::on_recv_rawdata, this, _1, _2, _3)));
++		readers.link("points", reader_variables<int32_t, std::vector<point_type>>(
++					 std::bind(&uniface::on_recv_points, this, _1, _2)));
++		readers.link("assignedVals", reader_variables<std::string, storage_single_t>(
++					 std::bind(&uniface::on_recv_assignedVals, this, _1, _2)));
++		readers.link("receivingSpan", reader_variables<int32_t, time_type, time_type, span_t>(
+ 		             std::bind(&uniface::on_recv_span, this, _1, _2, _3, _4)));
+-		readers.link("sending span", reader_variables<int32_t, time_type, time_type, span_t>(
++		readers.link("sendingSpan", reader_variables<int32_t, time_type, time_type, span_t>(
+ 		             std::bind(&uniface::on_send_span, this, _1, _2, _3, _4)));
+-		readers.link("receiving disable", reader_variables<int32_t>(
++		readers.link("receivingDisable", reader_variables<int32_t>(
+ 					 std::bind(&uniface::on_send_disable, this, _1)));
+-		readers.link("sending disable", reader_variables<int32_t>(
++		readers.link("sendingDisable", reader_variables<int32_t>(
+ 					 std::bind(&uniface::on_recv_disable, this, _1)));
+-		readers.link("data", reader_variables<time_type, frame_type>(
+-		             std::bind(&uniface::on_recv_data, this, _1, _2)));
+-		readers.link("rawdata", reader_variables<int32_t, time_type, frame_raw_type>(
+-		             std::bind(&uniface::on_recv_rawdata, this, _1, _2, _3)));
+-		readers.link("points", reader_variables<int32_t, std::vector<point_type>>(
+-		             std::bind(&uniface::on_recv_points, this, _1, _2)));
+-		readers.link("assignedVals", reader_variables<std::string, storage_single_t>(
+-		             std::bind(&uniface::on_recv_assignedVals, this, _1, _2)));
+ 	}
+ 
+ 	uniface( const uniface& ) = delete;
+ 	uniface& operator=( const uniface& ) = delete;
+     
+-    
+     /** \brief Push data with tag "attr" to buffer
+      * Push data with tag "attr" to buffer. If using CONFIG::FIXEDPOINTS=true,
+      * data must be pushed in the same order that the points were previously pushed.
+@@ -270,13 +278,13 @@
+ 
+ 	/** \brief Push the value \c value to the parameter \c attr
+ 	  * Useful if, for example, you wish to pass a parameter
+-	  * rather than a field.
++	  * rather than a field without an associated timestamp
+ 	  */
+ 	template<typename TYPE>
+ 	void push( const std::string& attr, const TYPE value ) {
+ 		comm->send(message::make("assignedVals", attr, storage_single_t(TYPE(value))));
+ 	}
+-	
++
+ #ifdef PYTHON_BINDINGS
+     template<typename TYPE>
+     void push_many(const std::string& attr, const class py::array_t<REAL>& points,
+@@ -324,122 +332,225 @@
+     }
+ 
+ #endif
++    /** \brief Fetch a single parameter from the interface
++	  * Overloaded \c fetch to fetch a single parameter of name \c attr.
++	  * There is no barrier on this fetch as there is no time associated
++	  * with the value.
++	  */
++	template<typename TYPE>
++	TYPE fetch( const std::string& attr ) {
++		storage_single_t& n = assigned_values[attr];
++		if( !n ) return TYPE();
++		return storage_cast<TYPE&>(n);
++	}
+ 
++    /** \brief Fetch from the interface, blocking with barrier at time=t
++	  */
+ 	template<class SAMPLER, class TIME_SAMPLER, typename ... ADDITIONAL>
+ 	typename SAMPLER::OTYPE
+ 	fetch( const std::string& attr,const point_type focus, const time_type t,
+-	       SAMPLER& sampler, const TIME_SAMPLER &t_sampler,
+-		   bool barrier_enabled = true, time_type barrier_time = std::numeric_limits<time_type>::min(),
++		   SAMPLER& sampler, const TIME_SAMPLER &t_sampler, bool barrier_enabled = true,
+ 		   ADDITIONAL && ... additional ) {
+-		if(barrier_enabled){
+-			if(barrier_time == std::numeric_limits<time_type>::min())
+-				barrier_time = t_sampler.get_upper_bound(t);
+-			barrier(barrier_time);
+-		}
+-		else{
+-			acquire();
+-		}
+-
+-		std::vector<std::pair<time_type,typename SAMPLER::OTYPE> > v;
+-
+-		for( auto first=log.lower_bound(t_sampler.get_lower_bound(t)-threshold(t)),
+-		     last = log.upper_bound(t_sampler.get_upper_bound(t)+threshold(t)); first!= last; ++first ){
+-			time_type time = first->first;
+-			const auto& iter = first->second.find(attr);
+-			if( iter == first->second.end() ) continue;
++		if(barrier_enabled)
++			barrier(t_sampler.get_upper_bound(t));
++
++		std::vector<std::pair<std::pair<time_type,time_type>,typename SAMPLER::OTYPE> > v;
++		std::pair<time_type,time_type> curr_time_lower(t_sampler.get_lower_bound(t)-threshold(t),std::numeric_limits<time_type>::lowest());
++		std::pair<time_type,time_type> curr_time_upper(t_sampler.get_upper_bound(t)+threshold(t),std::numeric_limits<time_type>::lowest());
++
++		auto end = log.end();
++		if(log.size() > 1)
++			end = log.upper_bound(curr_time_upper);
++
++		for( auto start = log.lower_bound(curr_time_lower); start != end; ++start ) {
++			std::pair<time_type,time_type> time(start->first.first,std::numeric_limits<time_type>::lowest());
++			const auto& iter = start->second.find(attr);
++			if( iter == start->second.end() ) continue;
+ 			v.emplace_back( time, iter->second.build_and_query_ts( focus, sampler, additional... ) );
+ 		}
++
+ 		return t_sampler.filter(t, v);
+ 	}
+ 
+-	/** \brief Fetch a single parameter from the interface
+-	  * Overloaded \c fetch to fetch a single parameter of name \c attr.
+-	  * There is no barrier on this fetch as there is no time associated
+-	  * with the value.
++	/** \brief Fetch from the interface, blocking with barrier at time=t1,t2
+ 	  */
+-	template<typename TYPE>
+-	TYPE fetch( const std::string& attr ) {
+-	    storage_single_t& n = assigned_values[attr];
+-		if( !n ) return TYPE();
+-		return storage_cast<TYPE&>(n);
++	template<class SAMPLER, class TIME_SAMPLER, typename ... ADDITIONAL>
++	typename SAMPLER::OTYPE
++	fetch( const std::string& attr,const point_type focus, const time_type t1, const time_type t2,
++		   SAMPLER& sampler, const TIME_SAMPLER &t_sampler, bool barrier_enabled = true,
++		   ADDITIONAL && ... additional ) {
++		if(barrier_enabled)
++			barrier(t_sampler.get_upper_bound(t1),t_sampler.get_upper_bound(t2));
++
++		std::vector<std::pair<std::pair<time_type,time_type>,typename SAMPLER::OTYPE> > v;
++		std::pair<time_type,time_type> curr_time_lower(t_sampler.get_lower_bound(t1)-threshold(t1),t_sampler.get_lower_bound(t2)-threshold(t2));
++		std::pair<time_type,time_type> curr_time_upper(t_sampler.get_upper_bound(t1)+threshold(t1),t_sampler.get_upper_bound(t2)+threshold(t2));
++
++		auto end = log.end();
++		if(log.size() > 1)
++			end = log.upper_bound(curr_time_upper);
++
++		for( auto start = log.lower_bound(curr_time_lower); start != end; ++start ) {
++			std::pair<time_type,time_type> time(start->first);
++			const auto& iter = start->second.find(attr);
++			if( iter == start->second.end() ) continue;
++			v.emplace_back( time, iter->second.build_and_query_ts( focus, sampler, additional... ) );
++		}
++
++		return t_sampler.filter(std::make_pair(t1,t2), v);
+ 	}
+ 
++	/** \brief Fetch points currently stored in the interface, blocking with barrier at time=t
++	 */
+ 	template<typename TYPE, class TIME_SAMPLER, typename ... ADDITIONAL>
+-        std::vector<point_type>
+-	fetch_points( const std::string& attr, const time_type t, const TIME_SAMPLER &t_sampler,
+-                  bool barrier_enabled = true, time_type barrier_time = std::numeric_limits<time_type>::min(),
+-                  ADDITIONAL && ... additional ) {
++    std::vector<point_type>
++	fetch_points( const std::string& attr, const time_type t,
++				  const TIME_SAMPLER &t_sampler, bool barrier_enabled = true, ADDITIONAL && ... additional ) {
++		if(barrier_enabled)
++			barrier(t_sampler.get_upper_bound(t));
++
+ 		using vec = std::vector<std::pair<point_type,TYPE> >;
+-		if(barrier_enabled){
+-			if(barrier_time == std::numeric_limits<time_type>::min())
+-				barrier_time = t_sampler.get_upper_bound(t);
+-			barrier(barrier_time);
+-		}
+-		else{
+-			acquire();
++		std::vector <point_type> return_points;
++
++		std::pair<time_type,time_type> curr_time_lower(t_sampler.get_lower_bound(t)-threshold(t),std::numeric_limits<time_type>::lowest());
++		std::pair<time_type,time_type> curr_time_upper(t_sampler.get_upper_bound(t)+threshold(t),std::numeric_limits<time_type>::lowest());
++
++		auto end = log.end();
++		if(log.size() > 1)
++			end = log.upper_bound(curr_time_upper);
++
++		for( auto start = log.lower_bound(curr_time_lower); start != end; ++start ){
++			const auto& iter = start->second.find(attr);
++			if( iter == start->second.end() ) continue;
++			const vec& ds = iter->second.template return_data<TYPE>();
++			return_points.reserve(ds.size());
++			for( size_t i=0; i<ds.size(); i++ ) {
++				return_points.emplace_back(ds[i].first);
++			}
+ 		}
+ 
++		return return_points;
++	}
++
++	/** \brief Fetch points currently stored in the interface, blocking with barrier at time=t1,t2
++	 */
++	template<typename TYPE, class TIME_SAMPLER, typename ... ADDITIONAL>
++	std::vector<point_type>
++	fetch_points( const std::string& attr, const time_type t1, const time_type t2,
++				  const TIME_SAMPLER &t_sampler, bool barrier_enabled = true, ADDITIONAL && ... additional ) {
++		if(barrier_enabled)
++			barrier(t_sampler.get_upper_bound(t1),t_sampler.get_upper_bound(t2));
++
++		using vec = std::vector<std::pair<point_type,TYPE> >;
+ 		std::vector <point_type> return_points;
+ 
+-		for( auto first=log.lower_bound(t_sampler.get_lower_bound(t)-threshold(t)),
+-		     last = log.upper_bound(t_sampler.get_upper_bound(t)+threshold(t)); first != last; ++first ){
+-			const auto& iter = first->second.find(attr);
+-			if( iter == first->second.end() ) continue;
++		std::pair<time_type,time_type> curr_time_lower(t_sampler.get_lower_bound(t1)-threshold(t1),t_sampler.get_lower_bound(t2)-threshold(t2));
++		std::pair<time_type,time_type> curr_time_upper(t_sampler.get_upper_bound(t1)+threshold(t1),t_sampler.get_upper_bound(t2)+threshold(t2));
++
++		auto end = log.end();
++		if(log.size() > 1)
++			end = log.upper_bound(curr_time_upper);
++
++		for( auto start = log.lower_bound(curr_time_lower); start != end; ++start ){
++			const auto& iter = start->second.find(attr);
++			if( iter == start->second.end() ) continue;
+ 			const vec& ds = iter->second.template return_data<TYPE>();
+ 			return_points.reserve(ds.size());
+ 			for( size_t i=0; i<ds.size(); i++ ) {
+ 				return_points.emplace_back(ds[i].first);
+ 			}
+ 		}
++
+ 		return return_points;
+ 	}
+ 
++	/** \brief Fetch values currently stored in the interface, blocking with barrier at time=t
++	 */
+ 	template<typename TYPE, class TIME_SAMPLER, typename ... ADDITIONAL>
+-    std::vector<TYPE>
+-	fetch_values( const std::string& attr, const time_type t, const TIME_SAMPLER &t_sampler,
+-			      bool barrier_enabled = true, time_type barrier_time = std::numeric_limits<time_type>::min(),
+-			      ADDITIONAL && ... additional ) {
++	std::vector<TYPE>
++	fetch_values( const std::string& attr, const time_type t,
++				  const TIME_SAMPLER &t_sampler, bool barrier_enabled = true, ADDITIONAL && ... additional ) {
++		if(barrier_enabled)
++			barrier(t_sampler.get_upper_bound(t));
++
+ 		using vec = std::vector<std::pair<point_type,TYPE> >;
+-		if(barrier_enabled){
+-			if(barrier_time == std::numeric_limits<time_type>::min())
+-				barrier_time = t_sampler.get_upper_bound(t);
+-			barrier(barrier_time);
+-		}
+-		else{
+-			acquire();
++		std::vector<TYPE> return_values;
++
++		std::pair<time_type,time_type> curr_time_lower(t_sampler.get_lower_bound(t)-threshold(t),std::numeric_limits<time_type>::lowest());
++		std::pair<time_type,time_type> curr_time_upper(t_sampler.get_upper_bound(t)+threshold(t),std::numeric_limits<time_type>::lowest());
++
++		auto end = log.end();
++		if(log.size() > 1)
++			end = log.upper_bound(curr_time_upper);
++
++		for( auto start = log.lower_bound(curr_time_lower); start != end; ++start ){
++			const auto& iter = start->second.find(attr);
++			if( iter == start->second.end() ) continue;
++			const vec& ds = iter->second.template return_data<TYPE>();
++			return_values.reserve(ds.size());
++			for( size_t i=0; i<ds.size(); i++ ) {
++				return_values.emplace_back(ds[i].second);
++			}
+ 		}
+ 
++		return return_values;
++	}
++
++	/** \brief Fetch values currently stored in the interface, blocking with barrier at time=t1,t2
++	 */
++	template<typename TYPE, class TIME_SAMPLER, typename ... ADDITIONAL>
++    std::vector<TYPE>
++	fetch_values( const std::string& attr, const time_type t1, const time_type t2,
++				  const TIME_SAMPLER &t_sampler, bool barrier_enabled = true, ADDITIONAL && ... additional ) {
++		if(barrier_enabled)
++			barrier(t_sampler.get_upper_bound(t1),t_sampler.get_upper_bound(t2));
++
++		using vec = std::vector<std::pair<point_type,TYPE> >;
+ 		std::vector<TYPE> return_values;
+ 
+-		for( auto first=log.lower_bound(t_sampler.get_lower_bound(t)-threshold(t)),
+-		     last = log.upper_bound(t_sampler.get_upper_bound(t)+threshold(t)); first != last; ++first ){
+-			const auto& iter = first->second.find(attr);
+-			if( iter == first->second.end() ) continue;
++		std::pair<time_type,time_type> curr_time_lower(t_sampler.get_lower_bound(t1)-threshold(t1),t_sampler.get_lower_bound(t2)-threshold(t2));
++		std::pair<time_type,time_type> curr_time_upper(t_sampler.get_upper_bound(t1)+threshold(t1),t_sampler.get_upper_bound(t2)+threshold(t2));
++
++		auto end = log.end();
++		if(log.size() > 1)
++			end = log.upper_bound(curr_time_upper);
++
++		for( auto start = log.lower_bound(curr_time_lower); start != end; ++start ){
++			const auto& iter = start->second.find(attr);
++			if( iter == start->second.end() ) continue;
+ 			const vec& ds = iter->second.template return_data<TYPE>();
+ 			return_values.reserve(ds.size());
+ 			for( size_t i=0; i<ds.size(); i++ ) {
+ 				return_values.emplace_back(ds[i].second);
+ 			}
+ 		}
++
+ 		return return_values;
+ 	}
+ 
+ 	/** \brief Serializes pushed data and sends it to remote nodes
+-	  * Serializes pushed data and sends it to remote nodes.  
++	  * Serializes pushed data and sends it to remote nodes.
+ 	  * Returns the actual number of peers contacted
+ 	  */
+-	int commit( time_type timestamp ) {
++	int commit( time_type t1, time_type t2 = std::numeric_limits<time_type>::lowest() ) {
+ 	    std::vector<bool> is_sending(comm->remote_size(), true);
+-	    std::vector<bool> not_disabled(comm->remote_size(), true);
++	    std::vector<bool> is_enabled(comm->remote_size(), true);
++	    std::pair<time_type,time_type> time(t1,t2);
++
++	    // Check if peer set to disabled (not linked to time span)
++	    for( std::size_t i=0; i<peers.size(); ++i ) {
++	    	if(peers[i].is_recv_disabled())
++	    		is_enabled[i] = false;
++		}
+ 
+-	    if( (((span_start < timestamp) || almost_equal(span_start, timestamp)) && ((timestamp < span_timeout) || almost_equal(timestamp, span_timeout))) ) {
++	    // Check for smart send based on t1
++	    if( (((span_start < t1) || almost_equal(span_start, t1)) &&
++	    	((t1 < span_timeout) || almost_equal(t1, span_timeout))) ) {
+ 			for( std::size_t i=0; i<peers.size(); ++i ) {
+-				if(!peers[i].is_recv_disabled()){
+-					is_sending[i] = peers[i].is_recving( timestamp, current_span );
+-					not_disabled[i] = true;
+-				}
+-				else
++				if(!is_enabled[i]) // Peer is completely disabled
+ 					is_sending[i] = false;
++				else // Check peer using typical smart send procedure
++					is_sending[i] = peers[i].is_recving( t1, current_span );
+ 			}
+ 		}
+ 
+@@ -448,153 +559,269 @@
+ 				comm->send(message::make("points",comm->local_rank(),std::move(push_buffer_pts)), is_sending);
+ 				initialized_pts_ = true;
+ 			}
+-			comm->send(message::make("rawdata",comm->local_rank(),timestamp,std::move(push_buffer_raw)), is_sending);
++			comm->send(message::make("rawdata",comm->local_rank(),time,std::move(push_buffer_raw)), is_sending);
+ 			push_buffer_raw.clear();
+ 			push_buffer_pts.clear();
+ 		}
+ 		else {
+-			comm->send(message::make("data",timestamp,std::move(push_buffer)), is_sending);
++			comm->send(message::make("data",time,std::move(push_buffer)), is_sending);
+ 			push_buffer.clear();
+ 		}
+ 
+-		comm->send(message::make("timestamp", comm->local_rank(), timestamp), not_disabled);
++		comm->send(message::make("timestamp",comm->local_rank(),time), is_sending);
+ 
+ 		return std::count( is_sending.begin(), is_sending.end(), true );
+ 	}
+ 
+-	void forecast( time_type timestamp ) {
+-		comm->send(message::make("forecast", comm->local_rank(), timestamp));
++	/** \brief Sends a forecast of an upcoming time to remote nodes
++	  */
++	void forecast( time_type t1, time_type t2 = std::numeric_limits<time_type>::lowest()) {
++		std::pair<time_type,time_type> time(t1,t2);
++		comm->send(message::make("forecast", comm->local_rank(), time));
++	}
++
++	/** \brief Tests whether data is available at time t1
++	  */
++	bool is_ready( const std::string& attr, time_type t1 ) const {
++		using logitem_ref_t = typename decltype(log)::const_reference;
++		return std::any_of(log.begin(), log.end(), [=](logitem_ref_t time_frame) {
++			return time_frame.second.find(attr) != time_frame.second.end(); }) // return false for attributes that don't exist.
++			&& std::all_of(peers.begin(), peers.end(), [=](const peer_state& p) {
++			return (p.is_send_disabled()) || (!p.is_sending(t1, recv_span)) ||
++				   ((((p.current_t() > t1) || almost_equal(p.current_t(), t1)) || (p.next_t() > t1))); });
+ 	}
+ 
+-	bool is_ready( const std::string& attr, time_type t ) const {
++	/** \brief Tests whether data is available at time t1 (or t1,t2)
++	  */
++	bool is_ready( const std::string& attr, time_type t1, time_type t2 ) const {
+ 		using logitem_ref_t = typename decltype(log)::const_reference;
+ 		return std::any_of(log.begin(), log.end(), [=](logitem_ref_t time_frame) {
+-			return time_frame.second.find(attr) != time_frame.second.end(); }) // return false for nonexisting attributes.
++			return time_frame.second.find(attr) != time_frame.second.end(); }) // return false for attributes that don't exist.
+ 			&& std::all_of(peers.begin(), peers.end(), [=](const peer_state& p) {
+-			return (p.is_send_disabled() ? true : !p.is_sending(t,recv_span)) ||
+-					(((p.current_t() > t) || almost_equal(p.current_t(), t)) || (p.next_t() > t)); });
++			return (p.is_send_disabled()) || (!p.is_sending(t1, recv_span)) ||
++				   ((((p.current_t() > t1) || almost_equal(p.current_t(), t1)) || (p.next_t() > t1)) &&
++					(((p.current_sub() > t2) || almost_equal(p.current_sub(), t2)) || (p.current_sub() > t2))); });
+ 	}
+ 
+-	void barrier( time_type t ) {
++	/** \brief Blocking barrier at t1. Initiates receive from remote nodes.
++	  */
++	void barrier( time_type t1 ) {
+ 		auto start = std::chrono::system_clock::now();
+ 		for(;;) {    // barrier must be thread-safe because it is called in fetch()
+ 			std::lock_guard<std::mutex> lock(mutex);
+ 			if( std::all_of(peers.begin(), peers.end(), [=](const peer_state& p) {
+-				return (p.is_send_disabled() ? true : !p.is_sending(t,recv_span)) ||
+-						(((p.current_t() > t) || almost_equal(p.current_t(), t)) || (p.next_t() > t)); }) ) break;
++				return (p.is_send_disabled()) || (!p.is_sending(t1, recv_span)) ||
++					   ((((p.current_t() > t1) || almost_equal(p.current_t(), t1)) || (p.next_t() > t1))); }) ) break;
+ 			acquire(); // To avoid infinite-loop when synchronous communication
+ 		}
+-		if( (std::chrono::system_clock::now() - start) > std::chrono::seconds(5) )
+-			std::cerr << "MUI Warning [uniface.h]: Communication barrier spends over 5 seconds" << std::endl;
++		if( (std::chrono::system_clock::now() - start) > std::chrono::seconds(5) ) {
++			if( !QUIET )
++				std::cout << "MUI Warning [uniface.h]: Communication barrier spends over 5 seconds" << std::endl;
++		}
+ 	}
+ 
+-	void announce_send_span( time_type start, time_type timeout, span_t s ){
+-		// say remote nodes that "I'll send this span."
+-	    comm->send(message::make("sending span", comm->local_rank(), start, timeout, std::move(s)));
++	/** \brief Blocking barrier at t1 (or t1,t2). Initiates receive from remote nodes.
++	  */
++	void barrier( time_type t1, time_type t2 ) {
++		auto start = std::chrono::system_clock::now();
++		for(;;) {    // barrier must be thread-safe because it is called in fetch()
++			std::lock_guard<std::mutex> lock(mutex);
++			if( std::all_of(peers.begin(), peers.end(), [=](const peer_state& p) {
++				return (p.is_send_disabled()) || (!p.is_sending(t1, recv_span)) ||
++					   ((((p.current_t() > t1) || almost_equal(p.current_t(), t1)) || (p.next_t() > t1)) &&
++					    (((p.current_sub() > t2) || almost_equal(p.current_sub(), t2)) || (p.next_sub() > t2))); }) ) break;
++			acquire(); // To avoid infinite-loop when synchronous communication
++		}
++		if( (std::chrono::system_clock::now() - start) > std::chrono::seconds(5) ) {
++			if( !QUIET )
++				std::cout << "MUI Warning [uniface.h]: Communication barrier spends over 5 seconds" << std::endl;
++		}
++	} 
++
++	/** \brief Announces to all remote nodes "I'll send this span"
++	  */
++	void announce_send_span( time_type start, time_type timeout, span_t s ) {
++	    comm->send(message::make("sendingSpan", comm->local_rank(), start, timeout, std::move(s)));
+ 		span_start = start;
+ 		span_timeout = timeout;
+ 		current_span.swap(s);
+ 	}
+ 
+-	void announce_send_disable(){
+-		// say remote nodes that "I'm disabled for send"
+-		comm->send(message::make("sending disable", comm->local_rank()));
++	/** \brief Announces to all remote nodes "I'm disabled for send"
++	  */
++	void announce_send_disable() {
++		comm->send(message::make("sendingDisable", comm->local_rank()));
+ 	}
+ 
+-	void announce_recv_span( time_type start, time_type timeout, span_t s ){
+-		// say remote nodes that "I'm receiving this span."
+-		comm->send(message::make("receiving span", comm->local_rank(), start, timeout, std::move(s)));
++	/** \brief Announces to all remote nodes "I'm receiving this span"
++	  */
++	void announce_recv_span( time_type start, time_type timeout, span_t s ) {
++		comm->send(message::make("receivingSpan", comm->local_rank(), start, timeout, std::move(s)));
+ 		recv_start = start;
+ 		recv_timeout = timeout;
+ 		recv_span.swap(s);
+ 	}
+ 
+-	void announce_recv_disable(){
+-		// say remote nodes that "I'm disabled for receive"
+-		comm->send(message::make("receiving disable", comm->local_rank()));
++	/** \brief Announces to all remote nodes "I'm disabled for receive"
++	  */
++	void announce_recv_disable() {
++		comm->send(message::make("receivingDisable", comm->local_rank()));
+ 	}
+ 
+-	// remove log between (-inf, @end]
+-	void forget( time_type end, bool reset_log = false ) {
+-		log.erase(log.begin(), log.upper_bound(end+threshold(end)));
++	/** \brief Removes log between (-inf, @last]
++	  */
++	void forget( time_type last, bool reset_log = false ) {
++		std::pair<time_type,time_type> upper_limit(last+threshold(last),std::numeric_limits<time_type>::lowest());
++		log.erase(log.begin(), log.upper_bound(upper_limit));
++
+ 		if(reset_log) {
+-			time_type curr_time = std::numeric_limits<time_type>::lowest();
++			std::pair<time_type,time_type> curr_time(std::numeric_limits<time_type>::lowest(),std::numeric_limits<time_type>::lowest());
+ 			if(!log.empty()) curr_time = log.rbegin()->first;
+ 			for(size_t i=0; i<peers.size(); i++) {
+-				peers.at(i).set_current_t(curr_time);
++				peers.at(i).set_current_t(curr_time.first);
++				peers.at(i).set_current_sub(curr_time.second);
+ 			}
+ 		}
+ 	}
+-	// remove log between [@first, @last]
++
++	/** \brief Removes log between ([-inf,-inf], [@last.first,@last.second]]
++	  */
++	void forget( std::pair<time_type, time_type> last, bool reset_log = false ) {
++		std::pair<time_type,time_type> upper_limit(last.first+threshold(last.first),last.second+threshold(last.second));
++		log.erase(log.begin(), log.upper_bound(upper_limit));
++
++		if(reset_log) {
++			std::pair<time_type,time_type> curr_time(std::numeric_limits<time_type>::lowest(),std::numeric_limits<time_type>::lowest());
++			if(!log.empty()) curr_time = log.rbegin()->first;
++			for(size_t i=0; i<peers.size(); i++) {
++				peers.at(i).set_current_t(curr_time.first);
++				peers.at(i).set_current_sub(curr_time.second);
++			}
++		}
++	}
++
++	/** \brief Removes log between [@first, @last]
++	  */
+ 	void forget( time_type first, time_type last, bool reset_log = false ) {
+-		log.erase(log.lower_bound(first-threshold(first)), log.upper_bound(last+threshold(last)));
++		std::pair<time_type,time_type> lower_limit(first-threshold(first),std::numeric_limits<time_type>::lowest());
++		std::pair<time_type,time_type> upper_limit(last+threshold(last),std::numeric_limits<time_type>::lowest());
++		log.erase(log.lower_bound(lower_limit), log.upper_bound(upper_limit));
++
++		if(reset_log) {
++			std::pair<time_type,time_type> curr_time(std::numeric_limits<time_type>::lowest(),std::numeric_limits<time_type>::lowest());
++			if(!log.empty()) curr_time = log.rbegin()->first;
++			for(size_t i=0; i<peers.size(); i++) {
++				peers.at(i).set_current_t(curr_time.first);
++				peers.at(i).set_current_sub(curr_time.second);
++			}
++		}
++	}
++
++	/** \brief Removes log between [[@first.first,@first.second], [@last.first,@last.second]]
++	  */
++	void forget( std::pair<time_type, time_type> first, std::pair<time_type, time_type> last, bool reset_log = false ) {
++		std::pair<time_type,time_type> lower_limit(first.first-threshold(first.first),first.second-threshold(first.second));
++		std::pair<time_type,time_type> upper_limit(last.first+threshold(last.first),last.second+threshold(last.second));
++		log.erase(log.lower_bound(lower_limit), log.upper_bound(upper_limit));
++
+ 		if(reset_log) {
+-			time_type curr_time = std::numeric_limits<time_type>::lowest();
++			std::pair<time_type,time_type> curr_time(std::numeric_limits<time_type>::lowest(),std::numeric_limits<time_type>::lowest());
+ 			if(!log.empty()) curr_time = log.rbegin()->first;
+ 			for(size_t i=0; i<peers.size(); i++) {
+-				peers.at(i).set_current_t(curr_time);
++				peers.at(i).set_current_t(curr_time.first);
++				peers.at(i).set_current_sub(curr_time.second);
+ 			}
+ 		}
+ 	}
+-	// remove log between (-inf, curent-@length] automatically. 
++
++	/** \brief Removes log between (-inf, current-@length] automatically.
++	  */
+ 	void set_memory( time_type length ) {
+ 		memory_length = length;
+ 	}
+ 	
+ private:
+-	// triggers communication
++	/** \brief Triggers communication
++	  */
+ 	void acquire() {
+ 		message m = comm->recv();
+-		if( m.has_id() ) readers[m.id()](m);
++		if( m.has_id() ){
++			readers[m.id()](m);
++		}
+ 	}
+ 
+-	void on_recv_confirm( int32_t sender, time_type timestamp ) {
+-		peers.at(sender).set_current_t(timestamp);
++	/** \brief Handles "timestamp" messages
++	  */
++	void on_recv_confirm( int32_t sender, std::pair<time_type,time_type> timestamp ) {
++		peers.at(sender).set_current_t(timestamp.first);
++		peers.at(sender).set_current_sub(timestamp.second);
+ 	}
+ 
+-	void on_recv_forecast( int32_t sender, time_type timestamp ) {
+-		peers.at(sender).set_next_t(timestamp);
++	/** \brief Handles "forecast" messages
++	  */
++	void on_recv_forecast( int32_t sender, std::pair<time_type,time_type> timestamp ) {
++		peers.at(sender).set_next_t(timestamp.first);
++		peers.at(sender).set_next_sub(timestamp.second);
+ 	}
+ 
+-	void on_recv_data( time_type timestamp, frame_type frame ) {
+-		// when message.id_ == "data"
++	/** \brief Handles "data" messages
++	  */
++	void on_recv_data( std::pair<time_type,time_type> timestamp, frame_type frame ) {
+ 		auto itr = log.find(timestamp);
+ 
+-		if( itr == log.end() ) std::tie(itr,std::ignore) = log.insert(std::make_pair(timestamp,bin_frame_type()));
++		if( itr == log.end() )
++			std::tie(itr,std::ignore) = log.insert(std::make_pair(timestamp,bin_frame_type()));
++
+ 		auto& cur = itr->second;
++
+ 		for( auto& p: frame ){
+ 			auto pstr = cur.find(p.first);
+ 			if( pstr == cur.end() ) cur.insert(std::make_pair(std::move(p.first),spatial_t(std::move(p.second))));
+ 			else pstr->second.insert(p.second);
+ 		}
+-		log.erase(log.begin(), log.upper_bound(timestamp-memory_length));
++
++		log.erase(log.begin(), log.upper_bound({timestamp.first-memory_length, timestamp.second}));
+ 	}
+ 
+-	void on_recv_rawdata( int32_t sender, time_type timestamp, frame_raw_type frame ) {
++	/** \brief Handles "data" messages
++	  */
++	void on_recv_rawdata( int32_t sender, std::pair<time_type,time_type> timestamp, frame_raw_type frame ) {
+ 		frame_type buf = associate( sender, frame );
+ 		on_recv_data( timestamp, buf );
+ 	}
+ 
++	/** \brief Handles "receivingSpan" messages
++	  */
+ 	void on_recv_span( int32_t sender, time_type start, time_type timeout, span_t s ) {
+ 		peers.at(sender).set_recving(start,timeout,std::move(s));
+ 	}
+ 
+-	void on_send_span( int32_t sender, time_type start, time_type timeout, span_t s ){
++	/** \brief Handles "sendingSpan" messages
++	  */
++	void on_send_span( int32_t sender, time_type start, time_type timeout, span_t s ) {
+ 		peers.at(sender).set_sending(start,timeout,std::move(s));
+ 	}
+ 
++	/** \brief Handles "sendingDisable" messages
++	  */
+ 	void on_recv_disable( int32_t sender ) {
+ 		peers.at(sender).set_recv_disable();
+ 	}
+ 
+-	void on_send_disable( int32_t sender ){
++	/** \brief Handles "receivingDisable" messages
++	  */
++	void on_send_disable( int32_t sender ) {
+ 		peers.at(sender).set_send_disable();
+ 	}
+ 
++	/** \brief Handles "points" messages
++	  */
+ 	void on_recv_points( int32_t sender, std::vector<point_type> points ) {
+ 		peers.at(sender).set_pts(points);
+ 	}
+ 
++	/** \brief Handles "assignedVals" messages
++	  */
+ 	void on_recv_assignedVals( std::string attr, storage_single_t data ) {
+ 		typename std::unordered_map<std::string, storage_single_t >::iterator it = assigned_values.find(attr);
+ 		if (it != assigned_values.end())
+@@ -603,6 +830,8 @@
+ 			assigned_values.insert( std::pair<std::string, storage_single_t>( attr, data ) );
+ 	}
+     
++	/** \brief Associates raw data and point data together after both received
++	  */
+ 	frame_type associate( int32_t sender, frame_raw_type& frame ) {
+ 		frame_type buf;
+ 		for( auto& p: frame ){
+@@ -630,18 +859,3 @@
+ }
+ 
+ #endif // _UNIFACE_H
+-
+-// TO-DO
+-// [x] in uniface::barrier: give time-out warning  <- requires try_recv
+-// [x] void uniface::forget( time_type time );
+-// [x] void uniface::forget( time_type begin, time_type end );
+-// [x] void uniface::set_memory( time_type length );
+-// [x] bool uniface::is_ready( std::string attr );
+-// [x] void uniface::forecast( time_type stamp );
+-// [x] python wrapper
+-// [ ] linear solver
+-// [ ] config generator
+-// [ ] logger
+-// [ ] periodicity policy
+-// [ ] shm://domain/interface, create pipes in /dev/shm/interface
+-// [ ] void uniface::recommit( time_type stamp, INT version );
+diff -uraN MUI-1.0/util.h v1.1_dev/util.h
+--- MUI-1.0/util.h	2020-01-31 11:48:46.000000000 +0000
++++ v1.1_dev/util.h	2020-10-27 15:26:55.000000000 +0000
+@@ -156,228 +156,6 @@
+ 	return 1.0;
+ }
+ 
+-///****************************************************************************
+-//MATRIX
+-//*****************************************************************************/
+-//
+-//template<typename TYPE, uint M=3, uint N=3>
+-//struct matrix {
+-//	matrix() {
+-//		for(uint i=0; i<M; i++) for(uint j=0; j<N; j++) _e[i][j] = 0.;
+-//	}
+-//	matrix( const matrix& other ) {
+-//		*this = other;
+-//	}
+-//	matrix& operator = ( const matrix& other ) {
+-//		for(uint i=0; i<M; i++) for(uint j=0; j<N; j++) _e[i][j] = other._e[i][j];
+-//		return *this;
+-//	}
+-//
+-//	inline const TYPE& operator () (uint row, uint col) const {
+-//		assert(row<M&&col<N);
+-//		return _e[row][col];
+-//	}
+-//	inline TYPE& operator () (uint row, uint col) {
+-//		assert(row<M&&col<N);
+-//		return _e[row][col];
+-//	}
+-//	inline int m() const {
+-//		return M;
+-//	}
+-//	inline int n() const {
+-//		return N;
+-//	}
+-//protected:
+-//	TYPE _e[M][N];
+-//};
+-//
+-//template<typename TYPE, uint M=3, uint N=3>
+-//struct eye: public matrix<TYPE,M,N> {
+-//	eye() {
+-//		assert(M==N);
+-//		for(uint i=0; i<M; i++) this->_e[i][i] = 1.;
+-//	}
+-//};
+-//
+-//template<typename TYPE, uint N, uint M, uint K>
+-//matrix<TYPE,N,M> operator * ( const matrix<TYPE,N,K> m1, const matrix<TYPE,K,M> &m2 )
+-//{
+-//	matrix<TYPE,N,M> r;
+-//	for(uint i=0; i<N; i++)
+-//		for(uint j=0; j<M; j++)
+-//			for(uint k=0; k<K; k++)
+-//				r(i,j) += m1(i,k) * m2(k,j);
+-//	return r;
+-//}
+-//
+-///****************************************************************************
+-//VECTOR/POINT/COORDINATE
+-//*****************************************************************************/
+-//
+-//template<typename TYPE, uint D>
+-//struct point {
+-//	TYPE x[D];
+-//
+-//	point() {}
+-//	point( const point &other ) {
+-//		*this = other;
+-//	}
+-//	point(TYPE r) {
+-//		for(uint i = 0 ; i < D ; i++) x[i] = r;
+-//	}
+-//	point(TYPE *a) {
+-//		for(uint i = 0 ; i < D ; i++) x[i] = *a++;
+-//	}
+-//	/*point(array<REAL,D> &r) {
+-//	    for(uint i = 0 ; i < D ; i++) x[i] = r[i];
+-//	    }*/
+-//	inline uint d() const {
+-//		return D;
+-//	}
+-//	inline point& operator = ( const point &other ) {
+-//		for(uint i = 0 ; i < D ; i++) x[i] = other.x[i];
+-//		return *this;
+-//	}
+-//	inline point& operator = ( const matrix<TYPE,D,1>& m ) {
+-//		for(uint i = 0 ; i < D ; i++ ) x[i] = m(i,0);
+-//		return *this;
+-//	}
+-//	inline operator matrix<TYPE,D,1> () const {
+-//		matrix<TYPE,D,1> m;
+-//		for(uint i = 0 ; i < D ; i++ ) m(i,0) = x[i];
+-//		return m;
+-//	}
+-//
+-//	inline void operator += ( const point &v ) {
+-//		for(uint i = 0 ; i < D ; i++) x[i] += v.x[i];
+-//	}
+-//	inline void operator -= ( const point &v ) {
+-//		for(uint i = 0 ; i < D ; i++) x[i] -= v.x[i];
+-//	}
+-//	inline void operator *= ( const TYPE k ) {
+-//		for(uint i = 0 ; i < D ; i++) x[i] *= k;
+-//	}
+-//	inline void operator *= ( const point &v ) { // element-wise product
+-//		for(uint i = 0 ; i < D ; i++) x[i] *= v.x[i];
+-//	}
+-//	inline void operator /= ( const TYPE k ) {
+-//		for(uint i = 0 ; i < D ; i++) x[i] /= k;
+-//	}
+-//	inline void operator /= ( const point &v ) { // element-wise division
+-//		for(uint i = 0 ; i < D ; i++) x[i] /= v.x[i];
+-//	}
+-//	inline TYPE dot( const point &v ) const {
+-//		TYPE s = 0.;
+-//		for(uint i = 0 ; i < D ; i++) s += x[i] * v.x[i];
+-//		return s;
+-//	}
+-//	inline point cross( const point &v ) const {
+-//		assert(D==3);
+-//		point n;
+-//		n[0] = x[1] * v.x[2] - v.x[1] * x[2];
+-//		n[1] = x[2] * v.x[0] - v.x[2] * x[0];
+-//		n[2] = x[0] * v.x[1] - v.x[0] * x[1];
+-//		return n;
+-//	}
+-//
+-//	inline const TYPE& operator [] ( uint i ) const { // C style
+-//		assert(i<D);
+-//		return x[i];
+-//	}
+-//	inline TYPE& operator [] ( uint i ) { // C style
+-//		assert(i<D);
+-//		return x[i];
+-//	}
+-//	inline const TYPE& operator () ( uint i ) const { // MATLAB style
+-//		assert(i-1<D);
+-//		return x[i-1];
+-//	}
+-//	inline TYPE& operator () ( uint i ) { // MATLAB style
+-//		assert(i-1<D);
+-//		return x[i-1];
+-//	}
+-//
+-//	inline TYPE normsq() const {
+-//		return dot(*this);
+-//	}
+-//	inline TYPE norm() const {
+-//		return std::sqrt( normsq() );
+-//	}
+-//
+-//	template<typename FUNCTOR>
+-//	inline void apply( FUNCTOR func ) {
+-//		for(uint i = 0 ; i < D ; i++) x[i] = func( x[i] );
+-//	}
+-//
+-////    template<typename TYPE>
+-////    inline operator TYPE () {
+-////    	return dynamic_cast<TYPE>(*x);
+-////    }
+-//
+-//	friend inline point operator + ( point v1 , point v2 ) {
+-//		v1 += v2;
+-//		return v1;
+-//	}
+-//	friend inline point operator - ( point v1 , point v2 ) {
+-//		v1 -= v2;
+-//		return v1;
+-//	}
+-//	friend inline point operator - ( point v1 ) {
+-//		point s(0) ;
+-//		s -= v1;
+-//		return s;
+-//	}
+-//	friend inline point operator * ( TYPE k, point v ) {
+-//		v *= k;
+-//		return v;
+-//	}
+-//	friend inline point operator * ( point v, TYPE k ) {
+-//		v *= k;
+-//		return v;
+-//	}
+-//	friend inline point operator * ( point v1, point v2 ) { // element-wise product
+-//		v1 *= v2;
+-//		return v1;
+-//	}
+-//	friend inline TYPE dot( point v1, point v2 ) { // dot product
+-//		return v1.dot(v2);
+-//	}
+-//	friend inline point operator / ( point v, TYPE k ) {
+-//		v *= 1/k;
+-//		return v;
+-//	}
+-//	friend inline point operator / ( TYPE k, point v ) {
+-//		point u(k);
+-//		u /= v;
+-//		return u;
+-//	}
+-//	friend inline point operator / ( point v1, point v2 ) {
+-//		v1 /= v2;
+-//		return v1;
+-//	}
+-//	friend inline point cross( point v1, point v2) {
+-//		return v1.cross(v2);
+-//	}
+-//	friend inline point floor( point v ) {
+-//		for(uint i = 0 ; i < D ; i++) v.x[i] = std::floor( v.x[i] );
+-//		return v;
+-//	}
+-//	friend inline point abs( point v ) {
+-//		for(uint i = 0 ; i < D ; i++) v.x[i] = std::abs( v.x[i] );
+-//		return v;
+-//	}
+-//	friend inline point clamp( point v, point l, point r ) {
+-//		for(uint i = 0 ; i < D ; i++) v.x[i] = clamp( v.x[i], l[i], r[i] );
+-//		return v;
+-//	}
+-//	friend inline std::ostream& operator << ( std::ostream& out, point v ) {
+-//		out<<'(';
+-//		for( int i = 0 ; i < D ; i++ ) out<<v[i]<<(i!=D-1?",":"");
+-//		out<<')';
+-//		return out;
+-//	}
+-//};
+-
+ template<typename T, uint D>
+ ostream& operator<<( ostream& stream, const point<T,D>& p )
+ {
+diff -uraN MUI-1.0/wrappers/C/mui_3d.cpp v1.1_dev/wrappers/C/mui_3d.cpp
+--- MUI-1.0/wrappers/C/mui_3d.cpp	2020-01-31 11:48:46.000000000 +0000
++++ v1.1_dev/wrappers/C/mui_3d.cpp	2021-02-15 21:29:12.537918100 +0000
+@@ -1,48 +1,50 @@
+-/*
+-Multiscale Universal Interface Code Coupling Library
+-
+-Copyright (C) 2017 Y. H. Tang, S. Kudo, X. Bian, Z. Li, G. E. Karniadakis
+-
+-This software is jointly licensed under the Apache License, Version 2.0
+-and the GNU General Public License version 3, you may use it according
+-to either.
+-
+-** Apache License, version 2.0 **
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-
+-** GNU General Public License, version 3 **
+-
+-This program is free software: you can redistribute it and/or modify
+-it under the terms of the GNU General Public License as published by
+-the Free Software Foundation, either version 3 of the License, or
+-(at your option) any later version.
+-
+-This program is distributed in the hope that it will be useful,
+-but WITHOUT ANY WARRANTY; without even the implied warranty of
+-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-GNU General Public License for more details.
+-
+-You should have received a copy of the GNU General Public License
+-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-
+-** File Details **
+-
+-Filename: mui_3d.cpp
+-Created: Jan 20, 2015
+-Author: Y. H. Tang
+-Description: C wrapper to create 3D MUI uniface.
+-*/
++/*****************************************************************************
++* Multiscale Universal Interface Code Coupling Library Demo 6                *
++*                                                                            *
++* Copyright (C) 2017 Y. H. Tang, S. Kudo, X. Bian, Z. Li, G. E. Karniadakis  *
++* Copyright (C) 2019 S. Rolfo (*STFC Daresbury laboratory)                   *
++*                                                                            *
++* This software is jointly licensed under the Apache License, Version 2.0    *
++* and the GNU General Public License version 3, you may use it according     *
++* to either.                                                                 *
++*                                                                            *
++* ** Apache License, version 2.0 **                                          *
++*                                                                            *
++* Licensed under the Apache License, Version 2.0 (the "License");            *
++* you may not use this file except in compliance with the License.           *
++* You may obtain a copy of the License at                                    *
++*                                                                            *
++* http://www.apache.org/licenses/LICENSE-2.0                                 *
++*                                                                            *
++* Unless required by applicable law or agreed to in writing, software        *
++* distributed under the License is distributed on an "AS IS" BASIS,          *
++* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.   *
++* See the License for the specific language governing permissions and        *
++* limitations under the License.                                             *
++*                                                                            *
++* ** GNU General Public License, version 3 **                                *
++*                                                                            *
++* This program is free software: you can redistribute it and/or modify       *
++* it under the terms of the GNU General Public License as published by       *
++* the Free Software Foundation, either version 3 of the License, or          *
++* (at your option) any later version.                                        *
++*                                                                            *
++* This program is distributed in the hope that it will be useful,            *
++* but WITHOUT ANY WARRANTY; without even the implied warranty of             *
++* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
++* GNU General Public License for more details.                               *
++*                                                                            *
++* You should have received a copy of the GNU General Public License          *
++* along with this program.  If not, see <http://www.gnu.org/licenses/>.      *
++******************************************************************************/
++
++/**
++ * @file mui_3d.cpp
++ * @author Y. H. Tang
++ * @date Jan 20, 2015
++ * @brief C++ C wrapper to create 3D MUI uniface.
++ *
++ */
+ 
+ #include "../../mui.h"
+ 
+@@ -59,6 +61,8 @@
+ typedef sampler_nearest_neighbor3d<double> mui_sampler_nearest3d;
+ typedef sampler_pseudo_nearest_neighbor3d<double> mui_sampler_pseudo_nearest_neighbor3d;
+ typedef sampler_pseudo_nearest2_linear3d<double> mui_sampler_pseudo_nearest2_linear3d;
++typedef geometry::box3d mui_geometry_box3d;
++typedef geometry::sphere3d mui_geometry_sphere3d;
+ 
+ // allocator
+ mui_uniface3d* mui_create_uniface3d( const char *URI ) {
+@@ -73,11 +77,11 @@
+ 	return new mui_sampler_moving_average3d( point3d(dx,dy,dz) );
+ }
+ 
+-mui_sampler_exact3d* mui_create_sampler_exact3d() {
++mui_sampler_exact3d* mui_create_sampler_exact3d(void) {
+     return new mui_sampler_exact3d();
+ }
+ 
+-mui_sampler_nearest3d* mui_create_sampler_nearest3d() {
++mui_sampler_nearest3d* mui_create_sampler_nearest3d(void) {
+     return new mui_sampler_nearest3d();
+ }
+ 
+@@ -89,7 +93,7 @@
+     return new mui_sampler_pseudo_nearest2_linear3d( h );
+ }
+ 
+-mui_chrono_sampler_exact3d* mui_create_chrono_sampler_exact3d() {
++mui_chrono_sampler_exact3d* mui_create_chrono_sampler_exact3d(void) {
+ 	return new mui_chrono_sampler_exact3d;
+ }
+ 
+@@ -97,6 +101,14 @@
+ 	return new mui_chrono_sampler_mean3d( past, future );
+ }
+ 
++mui_geometry_box3d* mui_create_geometry_box3d(double l1_x, double l1_y, double l1_z, double l2_x, double l2_y, double l2_z){
++	return new mui_geometry_box3d(point3d(l1_x,l1_y,l1_z),point3d(l2_x,l2_y,l2_z));
++}
++
++mui_geometry_sphere3d* mui_create_geometry_sphere3d(double l1_x, double l1_y, double l1_z, double rr){
++	return new mui_geometry_sphere3d(point3d(l1_x,l1_y,l1_z),rr);
++}
++
+ // deallocator
+ void mui_destroy_uniface3d( mui_uniface3d *uniface ) {
+ 	delete uniface;
+@@ -129,6 +141,14 @@
+ 	delete sampler;
+ }
+ 
++void mui_destroy_geometry_box3d( mui_geometry_box3d* box3d){
++	delete box3d;
++}
++
++void mui_destroy_geometry_sphere3d( mui_geometry_sphere3d* sphere3d){
++	delete sphere3d;
++}
++
+ // push
+ void mui_push( mui_uniface3d* uniface, const char *attr, double x, double y, double z, double value ) {
+ 	uniface->push( std::string(attr), point3d(x,y,z), value );
+@@ -181,11 +201,33 @@
+ 	return uniface->fetch( std::string(attr), point3d(x,y,z), t, *spatial, *temporal );
+ }
+ 
++// announce send/receive using different geometries
++void mui_announce_send_span_box(mui_uniface3d* uniface, double t0, double tfin, mui_geometry_box3d *box3d){
++	uniface->announce_send_span( t0, tfin , *box3d );
++}
++
++void mui_announce_recv_span_box(mui_uniface3d* uniface, double t0, double tfin, mui_geometry_box3d *box3d){
++	uniface->announce_recv_span( t0, tfin , *box3d );
++}
++
++void mui_announce_send_span_sphere(mui_uniface3d* uniface, double t0, double tfin, mui_geometry_sphere3d *sphere3d){
++	uniface->announce_send_span( t0, tfin , *sphere3d );
++}
++
++void mui_announce_recv_span_sphere(mui_uniface3d* uniface, double t0, double tfin, mui_geometry_sphere3d *sphere3d){
++	uniface->announce_recv_span( t0, tfin , *sphere3d );
++}
++
+ // commit all data in buffer
+ void mui_commit( mui_uniface3d* uniface, double t ) {
+ 	uniface->commit( t );
+ }
+ 
++// commit all data in buffer and return number of communication
++int mui_commit_ranks( mui_uniface3d* uniface, double t ) {
++	return uniface->commit( t );
++}
++
+ // wait for peers
+ void mui_barrier( mui_uniface3d* uniface, double t ) {
+ 	uniface->barrier( t );
+@@ -201,8 +243,28 @@
+ 	return uniface->set_memory( length );
+ }
+ 
++// send a double
++void mui_send_double( mui_uniface3d* uniface, const char *attr, double value ) {
++        uniface->push( std::string(attr), value );
++}
++
++// fetch a double
++double mui_fetch_double( mui_uniface3d* uniface, const char *attr ) {
++        return uniface->fetch<double>( std::string(attr) );
++}
++
++// assign int
++void mui_send_int( mui_uniface3d* uniface, const char *attr, int value ) {
++        uniface->push( std::string(attr), value );
++}
++
++// fetch assigned
++int mui_fetch_int( mui_uniface3d* uniface, const char *attr ) {
++        return uniface->fetch<int>( std::string(attr) );
++}
++
+ // split comm
+-MPI_Comm mui_mpi_split_by_app() {
++MPI_Comm mui_mpi_split_by_app(void) {
+     return mpi_split_by_app();
+ }
+ 
+diff -uraN MUI-1.0/wrappers/C/mui_3d.h v1.1_dev/wrappers/C/mui_3d.h
+--- MUI-1.0/wrappers/C/mui_3d.h	2020-01-31 11:48:46.000000000 +0000
++++ v1.1_dev/wrappers/C/mui_3d.h	2021-02-15 21:29:12.538915400 +0000
+@@ -1,48 +1,50 @@
+-/*
+-Multiscale Universal Interface Code Coupling Library
+-
+-Copyright (C) 2017 Y. H. Tang, S. Kudo, X. Bian, Z. Li, G. E. Karniadakis
+-
+-This software is jointly licensed under the Apache License, Version 2.0
+-and the GNU General Public License version 3, you may use it according
+-to either.
+-
+-** Apache License, version 2.0 **
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-
+-** GNU General Public License, version 3 **
+-
+-This program is free software: you can redistribute it and/or modify
+-it under the terms of the GNU General Public License as published by
+-the Free Software Foundation, either version 3 of the License, or
+-(at your option) any later version.
+-
+-This program is distributed in the hope that it will be useful,
+-but WITHOUT ANY WARRANTY; without even the implied warranty of
+-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-GNU General Public License for more details.
+-
+-You should have received a copy of the GNU General Public License
+-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-
+-** File Details **
+-
+-Filename: mui_3d.h
+-Created: Jan 19, 2015
+-Author: Y. H. Tang
+-Description:
+-*/
++/*****************************************************************************
++* Multiscale Universal Interface Code Coupling Library Demo 6                *
++*                                                                            *
++* Copyright (C) 2017 Y. H. Tang, S. Kudo, X. Bian, Z. Li, G. E. Karniadakis  *
++* Copyright (C) 2019 S. Rolfo (*STFC Daresbury laboratory)                   *
++*                                                                            *
++* This software is jointly licensed under the Apache License, Version 2.0    *
++* and the GNU General Public License version 3, you may use it according     *
++* to either.                                                                 *
++*                                                                            *
++* ** Apache License, version 2.0 **                                          *
++*                                                                            *
++* Licensed under the Apache License, Version 2.0 (the "License");            *
++* you may not use this file except in compliance with the License.           *
++* You may obtain a copy of the License at                                    *
++*                                                                            *
++* http://www.apache.org/licenses/LICENSE-2.0                                 *
++*                                                                            *
++* Unless required by applicable law or agreed to in writing, software        *
++* distributed under the License is distributed on an "AS IS" BASIS,          *
++* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.   *
++* See the License for the specific language governing permissions and        *
++* limitations under the License.                                             *
++*                                                                            *
++* ** GNU General Public License, version 3 **                                *
++*                                                                            *
++* This program is free software: you can redistribute it and/or modify       *
++* it under the terms of the GNU General Public License as published by       *
++* the Free Software Foundation, either version 3 of the License, or          *
++* (at your option) any later version.                                        *
++*                                                                            *
++* This program is distributed in the hope that it will be useful,            *
++* but WITHOUT ANY WARRANTY; without even the implied warranty of             *
++* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
++* GNU General Public License for more details.                               *
++*                                                                            *
++* You should have received a copy of the GNU General Public License          *
++* along with this program.  If not, see <http://www.gnu.org/licenses/>.      *
++******************************************************************************/
++
++/**
++ * @file mui_3d.h
++ * @author Y. H. Tang
++ * @date Jan 19th 2020
++ * @brief C include for 3D points
++ *
++ */
+ 
+ #ifndef MUI_3D_H_
+ #define MUI_3D_H_
+@@ -58,19 +60,24 @@
+ typedef struct mui_sampler_nearest3d        mui_sampler_nearest3d;
+ typedef struct mui_sampler_pseudo_nearest_neighbor3d        mui_sampler_pseudo_nearest_neighbor3d;
+ typedef struct mui_sampler_pseudo_nearest2_linear3d        mui_sampler_pseudo_nearest2_linear3d;
++typedef struct mui_geometry_box3d                     mui_geometry_box3d;
++typedef struct mui_geometry_sphere3d                  mui_geometry_sphere3d;
+ 
+ /* allocator */
+ mui_uniface3d* mui_create_uniface3d( const char *URI );
+ mui_sampler_gauss3d* mui_create_sampler_3d( double r, double h );
+ mui_sampler_moving_average3d* mui_create_sampler_moving_average3d( double dx, double dy, double dz );
+-mui_sampler_exact3d* mui_create_sampler_exact3d();
+-mui_sampler_nearest3d* mui_create_sampler_nearest3d();
+-mui_sampler_pseudo_nearest_neighbor3d* mui_create_sampler_pseudo_nearest_neighbor3d();
+-mui_sampler_pseudo_nearest2_linear3d* mui_create_sampler_pseudo_nearest2_linear3d();
++mui_sampler_exact3d* mui_create_sampler_exact3d(void);
++mui_sampler_nearest3d* mui_create_sampler_nearest3d(void);
++mui_sampler_pseudo_nearest_neighbor3d* mui_create_sampler_pseudo_nearest_neighbor3d(double h);
++mui_sampler_pseudo_nearest2_linear3d* mui_create_sampler_pseudo_nearest2_linear3d(double h);
+ 
+-mui_chrono_sampler_exact3d* mui_create_chrono_sampler_exact3d();
++mui_chrono_sampler_exact3d* mui_create_chrono_sampler_exact3d(void);
+ mui_chrono_sampler_mean3d* mui_create_chrono_sampler_mean3d( double past, double future );
+ 
++mui_geometry_box3d* mui_create_geometry_box3d(double l1_x, double l1_y, double l1_z, double l2_x, double l2_y, double l2_z);
++mui_geometry_sphere3d* mui_create_geometry_sphere3d(double l1_x, double l1_y, double l1_z, double rr );
++
+ /* deallocator */
+ void mui_destroy_uniface3d( mui_uniface3d *uniface );
+ void mui_destroy_sampler_3d( mui_sampler_gauss3d* sampler );
+@@ -83,6 +90,9 @@
+ void mui_destroy_chrono_sampler_exact3d( mui_chrono_sampler_exact3d* sampler );
+ void mui_destroy_chrono_sampler_mean3d( mui_chrono_sampler_mean3d* sampler );
+ 
++void mui_destroy_geometry_box3d( mui_geometry_box3d* box3d);
++void mui_destroy_geometry_sphere3d( mui_geometry_sphere3d* sphere3d);
++
+ /* push */
+ void mui_push( mui_uniface3d* uniface, const char *attr, double x, double y, double z, double t );
+ 
+@@ -121,9 +131,25 @@
+ /*  temporal sampler: mean */
+ double mui_fetch_moving_average_mean( mui_uniface3d* uniface, const char *attr, double x, double y, double z, double t, mui_sampler_moving_average3d *spatial, mui_chrono_sampler_mean3d *temporal );
+ 
++/*  Connection between instances using different geomtries */
++/*  Announce Send Box */
++void mui_announce_send_span_box(mui_uniface3d* uniface, double t0, double tfin, mui_geometry_box3d *box3d);
++
++/*  Announce Receive Box */
++void mui_announce_recv_span_box(mui_uniface3d* uniface, double t0, double tfin, mui_geometry_box3d *box3d);
++
++/*  Announce Send Sphere */
++void mui_announce_send_span_sphere(mui_uniface3d* uniface, double t0, double tfin, mui_geometry_sphere3d *sphere3d);
++
++/*  Announce Receive Sphere*/
++void mui_announce_recv_span_sphere(mui_uniface3d* uniface, double t0, double tfin, mui_geometry_sphere3d *sphere3d);
++
+ /*  commit all data in buffer */
+ void mui_commit( mui_uniface3d*, double t );
+ 
++/*  commit all data in buffer and return the number of rank in the communication */
++int mui_commit_ranks( mui_uniface3d*, double t );
++
+ /*  wait for peers */
+ void mui_barrier( mui_uniface3d*, double t );
+ 
+@@ -133,6 +159,18 @@
+ /*  set automatic deletion */
+ void mui_set_memory( mui_uniface3d*, double length );
+ 
++// send double
++void mui_send_double( mui_uniface3d* uniface, const char *attr, double value );
++
++// fetch double
++double mui_fetch_double( mui_uniface3d* uniface, const char *attr );
++
++// send int
++void mui_send_int( mui_uniface3d* uniface, const char *attr, int value );
++
++// fetch int
++int mui_fetch_int( mui_uniface3d* uniface, const char *attr); 
++
+ /*  split comm */
+ MPI_Comm mui_mpi_split_by_app(void);
+ 
+diff -uraN MUI-1.0/wrappers/Python/mui4py/mui4py.cpp v1.1_dev/wrappers/Python/mui4py/mui4py.cpp
+--- MUI-1.0/wrappers/Python/mui4py/mui4py.cpp	2020-01-31 11:48:46.000000000 +0000
++++ v1.1_dev/wrappers/Python/mui4py/mui4py.cpp	2021-02-15 21:29:12.539912000 +0000
+@@ -104,17 +104,30 @@
+ #define FETCH_INSTANCE_SINGLE(SPATIAL_SAMPLER,CHRONO_SAMPLER,IO_TYPE) \
+    .def(replace_str("fetch_" STRINGIFY(IO_TYPE) "_" STRINGIFY(SPATIAL_SAMPLER) "_" STRINGIFY(CHRONO_SAMPLER),"_sampler", "").c_str(),\
+         (IO_TYPE (Tclass::*)(const string&, const mui::point<Treal,Tconfig::D>, const Ttime,\
+-        const mui::SPATIAL_SAMPLER<Tconfig,IO_TYPE,IO_TYPE>&, const mui::CHRONO_SAMPLER<Tconfig>&, bool, Ttime)) &Tclass::fetch, "") \
++        const mui::SPATIAL_SAMPLER<Tconfig,IO_TYPE,IO_TYPE>&, const mui::CHRONO_SAMPLER<Tconfig>&, bool)) &Tclass::fetch, "") \
+ 
+ #define FETCH_INSTANCE_MANY(SPATIAL_SAMPLER,CHRONO_SAMPLER,IO_TYPE) \
+    .def(replace_str("fetch_many_" STRINGIFY(IO_TYPE) "_" STRINGIFY(SPATIAL_SAMPLER) "_" STRINGIFY(CHRONO_SAMPLER),"_sampler", "").c_str(),\
+         (py::array_t<IO_TYPE,py::array::c_style> (Tclass::*) (const string& attr,const py::array_t<Treal,py::array::c_style> points, const Ttime t,\
+         const mui::SPATIAL_SAMPLER<Tconfig,IO_TYPE,IO_TYPE>& sampler, const mui::CHRONO_SAMPLER<Tconfig>& t_sampler)) &Tclass::fetch_many, "")
+ 
++#define FETCH_INSTANCE_SINGLE6(SPATIAL_SAMPLER,CHRONO_SAMPLER,IO_TYPE) \
++   .def(replace_str("fetch6_" STRINGIFY(IO_TYPE) "_" STRINGIFY(SPATIAL_SAMPLER) "_" STRINGIFY(CHRONO_SAMPLER),"_sampler", "").c_str(),\
++        (IO_TYPE (Tclass::*)(const string&, const mui::point<Treal,Tconfig::D>, const Ttime, const Ttime,\
++        const mui::SPATIAL_SAMPLER<Tconfig,IO_TYPE,IO_TYPE>&, const mui::CHRONO_SAMPLER<Tconfig>&, bool)) &Tclass::fetch, "")
++
++/* #define FETCH_INSTANCE_MANY6(SPATIAL_SAMPLER,CHRONO_SAMPLER,IO_TYPE) \
++   .def(replace_str("fetch_many6_" STRINGIFY(IO_TYPE) "_" STRINGIFY(SPATIAL_SAMPLER) "_" STRINGIFY(CHRONO_SAMPLER),"_sampler", "").c_str(),\
++        (py::array_t<IO_TYPE,py::array::c_style> (Tclass::*) (const string& attr,const py::array_t<Treal,py::array::c_style> points, const Ttime t1, const Ttime t2\
++        const mui::SPATIAL_SAMPLER<Tconfig,IO_TYPE,IO_TYPE>& sampler, const mui::CHRONO_SAMPLER<Tconfig>& t_sampler)) &Tclass::fetch_many6, "") */
++
+ #define FETCH_INSTANCE(SPATIAL_SAMPLER,CHRONO_SAMPLER,IO_TYPE) \
+     FETCH_INSTANCE_MANY(SPATIAL_SAMPLER,CHRONO_SAMPLER,IO_TYPE) \
+     FETCH_INSTANCE_SINGLE(SPATIAL_SAMPLER,CHRONO_SAMPLER,IO_TYPE)
+ 
++#define FETCH_INSTANCE6(SPATIAL_SAMPLER,CHRONO_SAMPLER,IO_TYPE) \
++    FETCH_INSTANCE_SINGLE6(SPATIAL_SAMPLER,CHRONO_SAMPLER,IO_TYPE)
++
+ 
+ #define FETCH_SAMPLER_EXACT(CHRONO_SAMPLER) \
+        FETCH_INSTANCE(sampler_exact,CHRONO_SAMPLER,double) \
+@@ -124,12 +137,26 @@
+        FETCH_INSTANCE_SINGLE(sampler_exact,CHRONO_SAMPLER,string)
+        // FETCH_INSTANCE(sampler_exact,CHRONO_SAMPLER,bool)
+ 
++#define FETCH_SAMPLER_EXACT6(CHRONO_SAMPLER) \
++       FETCH_INSTANCE6(sampler_exact,CHRONO_SAMPLER,double) \
++       FETCH_INSTANCE6(sampler_exact,CHRONO_SAMPLER,float) \
++       FETCH_INSTANCE6(sampler_exact,CHRONO_SAMPLER,int64_t) \
++       FETCH_INSTANCE6(sampler_exact,CHRONO_SAMPLER,int32_t)\
++       FETCH_INSTANCE_SINGLE6(sampler_exact,CHRONO_SAMPLER,string)
++       // FETCH_INSTANCE6(sampler_exact,CHRONO_SAMPLER,bool)
++
+ #define FETCH_SAMPLER_NUMERICAL(SPATIAL_SAMPLER,CHRONO_SAMPLER) \
+        FETCH_INSTANCE(SPATIAL_SAMPLER,CHRONO_SAMPLER,double) \
+        FETCH_INSTANCE(SPATIAL_SAMPLER,CHRONO_SAMPLER,float) \
+        FETCH_INSTANCE(SPATIAL_SAMPLER,CHRONO_SAMPLER,int64_t) \
+        FETCH_INSTANCE(SPATIAL_SAMPLER,CHRONO_SAMPLER,int32_t) 
+ 
++#define FETCH_SAMPLER_NUMERICAL6(SPATIAL_SAMPLER,CHRONO_SAMPLER) \
++       FETCH_INSTANCE6(SPATIAL_SAMPLER,CHRONO_SAMPLER,double) \
++       FETCH_INSTANCE6(SPATIAL_SAMPLER,CHRONO_SAMPLER,float) \
++       FETCH_INSTANCE6(SPATIAL_SAMPLER,CHRONO_SAMPLER,int64_t) \
++       FETCH_INSTANCE6(SPATIAL_SAMPLER,CHRONO_SAMPLER,int32_t) 
++
+ #ifdef USE_RBF
+ #define EXPAND_FETCH_NUMERICAL(CHRONO_SAMPLER) \
+        FETCH_SAMPLER_NUMERICAL(sampler_exact,CHRONO_SAMPLER) \
+@@ -142,6 +169,18 @@
+        FETCH_SAMPLER_NUMERICAL(sampler_sum_quintic,CHRONO_SAMPLER) \
+        FETCH_SAMPLER_NUMERICAL(sampler_moving_average,CHRONO_SAMPLER) \
+        FETCH_SAMPLER_NUMERICAL(sampler_rbf,CHRONO_SAMPLER)
++	   
++#define EXPAND_FETCH_NUMERICAL6(CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_exact,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_gauss,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_nearest_neighbor,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_pseudo_nearest2_linear,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_pseudo_nearest_neighbor,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_shepard_quintic,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_sph_quintic,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_sum_quintic,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_moving_average,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_rbf,CHRONO_SAMPLER)
+ 
+ #define EXPAND_FETCH_EXACT(CHRONO_SAMPLER) \
+        FETCH_SAMPLER_EXACT(CHRONO_SAMPLER) \
+@@ -154,6 +193,18 @@
+        FETCH_SAMPLER_NUMERICAL(sampler_sum_quintic,CHRONO_SAMPLER) \
+        FETCH_SAMPLER_NUMERICAL(sampler_moving_average,CHRONO_SAMPLER) \
+        FETCH_SAMPLER_NUMERICAL(sampler_rbf,CHRONO_SAMPLER)
++
++#define EXPAND_FETCH_EXACT6(CHRONO_SAMPLER) \
++       FETCH_SAMPLER_EXACT6(CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_gauss,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_nearest_neighbor,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_pseudo_nearest2_linear,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_pseudo_nearest_neighbor,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_shepard_quintic,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_sph_quintic,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_sum_quintic,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_moving_average,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_rbf,CHRONO_SAMPLER)
+ #else
+ 
+ #define EXPAND_FETCH_NUMERICAL(CHRONO_SAMPLER) \
+@@ -167,6 +218,17 @@
+        FETCH_SAMPLER_NUMERICAL(sampler_sum_quintic,CHRONO_SAMPLER) \
+        FETCH_SAMPLER_NUMERICAL(sampler_moving_average,CHRONO_SAMPLER)
+ 
++#define EXPAND_FETCH_NUMERICAL6(CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_exact,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_gauss,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_nearest_neighbor,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_pseudo_nearest2_linear,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_pseudo_nearest_neighbor,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_shepard_quintic,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_sph_quintic,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_sum_quintic,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_moving_average,CHRONO_SAMPLER)
++
+ #define EXPAND_FETCH_EXACT(CHRONO_SAMPLER) \
+        FETCH_SAMPLER_EXACT(CHRONO_SAMPLER) \
+        FETCH_SAMPLER_NUMERICAL(sampler_gauss,CHRONO_SAMPLER) \
+@@ -178,6 +240,17 @@
+        FETCH_SAMPLER_NUMERICAL(sampler_sum_quintic,CHRONO_SAMPLER) \
+        FETCH_SAMPLER_NUMERICAL(sampler_moving_average,CHRONO_SAMPLER)
+ 
++#define EXPAND_FETCH_EXACT6(CHRONO_SAMPLER) \
++       FETCH_SAMPLER_EXACT6(CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_gauss,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_nearest_neighbor,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_pseudo_nearest2_linear,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_pseudo_nearest_neighbor,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_shepard_quintic,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_sph_quintic,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_sum_quintic,CHRONO_SAMPLER) \
++       FETCH_SAMPLER_NUMERICAL6(sampler_moving_average,CHRONO_SAMPLER)
++
+ #endif
+ 
+ #define DEFINE_MUI_UNIFACE_FETCH_5ARGS() \
+@@ -186,6 +259,12 @@
+        EXPAND_FETCH_NUMERICAL(chrono_sampler_mean) \
+        EXPAND_FETCH_NUMERICAL(chrono_sampler_sum)
+ 
++#define DEFINE_MUI_UNIFACE_FETCH_6ARGS() \
++       EXPAND_FETCH_EXACT6(chrono_sampler_exact) \
++       EXPAND_FETCH_NUMERICAL6(chrono_sampler_gauss) \
++       EXPAND_FETCH_NUMERICAL6(chrono_sampler_mean) \
++       EXPAND_FETCH_NUMERICAL6(chrono_sampler_sum)
++
+ 
+ #define DECLARE_MUI_CPP2PY_CLASSES_0ARG(FUNCNAME,CLASSNAME)	\
+     DECLARE_MUI_CPP2PY_CLASSES_1ARG(FUNCNAME,CLASSNAME,void)
+@@ -320,8 +399,8 @@
+     py::class_<Tclass>(m, pyclass_name.c_str())
+     .def("commit", (int (Tclass::*)(Ttime)) &Tclass::commit, "")
+     .def("forecast", (void (Tclass::*)(Ttime)) &Tclass::forecast, "")
+-    .def("is_ready", &Tclass::is_ready, "")
+     .def("barrier", (void (Tclass::*)(Ttime)) &Tclass::barrier, "")
++    .def("barrier", (void (Tclass::*)(Ttime, Ttime)) &Tclass::barrier, "")
+     .def("forget", (void (Tclass::*)(Ttime, bool)) &Tclass::forget, "")
+     .def("forget", (void (Tclass::*)(Ttime, Ttime, bool)) &Tclass::forget, "")
+     .def("set_memory", (void (Tclass::*)(Ttime)) &Tclass::set_memory, "")
+@@ -332,6 +411,7 @@
+     DEFINE_MUI_UNIFACE_PUSH()
+     DEFINE_MUI_UNIFACE_FETCH_1ARG()
+     DEFINE_MUI_UNIFACE_FETCH_5ARGS()
++    DEFINE_MUI_UNIFACE_FETCH_6ARGS()
+ //Temporarily disabled the fetch_point function. Bind the variadic template later.
+ //    DEFINE_MUI_UNIFACE_FETCH_POINTS()
+     .def(py::init<const string &>());
+@@ -490,7 +570,7 @@
+     using Tpoint = typename Tconfig::point_type;
+     using Tclass = TclassTemplate<Tconfig,TArg1,TArg1>;
+     py::class_<Tclass>(m, pyclass_name.c_str())
+-    .def(py::init<Treal, std::vector<Tpoint> &, bool, Treal, bool>());
++    .def(py::init<Treal, std::vector<Tpoint> &, bool, Treal, bool, const std::string&, bool>());
+ }
+ 
+ #endif
+diff -uraN MUI-1.0/wrappers/Python/mui4py/mui4py.py v1.1_dev/wrappers/Python/mui4py/mui4py.py
+--- MUI-1.0/wrappers/Python/mui4py/mui4py.py	2020-01-31 11:48:46.000000000 +0000
++++ v1.1_dev/wrappers/Python/mui4py/mui4py.py	2021-02-15 21:29:12.540909000 +0000
+@@ -136,17 +136,23 @@
+     def commit(self, tstamp):
+         return self.raw.commit(tstamp)
+ 
+-    def barrier(self, t):
+-        self.raw.barrier(t)
++    def barrier(self, t1, t2=None):
++        if t2 is not None:
++            self.raw.barrier(t1, t2)
++        else:
++            self.raw.barrier(t1)
+ 
+     def forget(self, tend, tbegin=0.0):
+-        self.raw.forget(tbegin, tend)
++        self.raw.forget(tend, True)
+ 
+     def forecast(self, timestamp):
+         self.raw.forecast(timestamp)
+ 
+-    def is_ready(self, attr, t): 
+-        self.raw.is_ready(attr, t)
++    def is_ready(self, attr, t1, t2=None): 
++        if t2 is not None:
++            self.raw.is_ready(attr, t1, t2)
++        else:
++            self.raw.is_ready(attr, t1)
+ 
+     def set_memory(self, t):
+         self.raw.set_memmory(t)
+@@ -198,6 +204,39 @@
+                                                                     cs.fetch_signature())
+         return self._tags_fetch[tag][(fname_root,cs.signature,ss.signature)], ss, cs
+ 
++    def _get_fetch_6args(self, fname_root, tag, data_type, spatial_sampler, chrono_sampler):
++        assert issubclass(spatial_sampler.__class__, Sampler)
++        assert issubclass(chrono_sampler.__class__, ChronoSampler)
++        ss = None
++        cs = None
++        rehash_fetch = False
++        try:
++            ss = self._tags_spatial_samplers[tag][spatial_sampler.signature]
++        except KeyError:
++            ss = copy.copy(spatial_sampler)
++            ss.configure(self.config, data_type)
++            self._tags_spatial_samplers[tag][ss.signature] = ss 
++            rehash_fetch = True
++
++        try:
++            cs = self._tags_chrono_samplers[tag][chrono_sampler.signature]
++        except KeyError:
++            cs = copy.copy(chrono_sampler)
++            cs.configure(self.config, data_type, onlycheck=True)
++            self._tags_chrono_samplers[tag][cs.signature] = cs
++            rehash_fetch = True
++        if rehash_fetch:
++            self._tags_fetch[tag][("fetch6",cs.signature,ss.signature)] = "{}_{}_{}_{}".format("fetch", 
++                                                                    ALLOWED_IO_TYPES[data_type], 
++                                                                    ss.fetch_signature(), 
++                                                                    cs.fetch_signature())
++            self._tags_fetch[tag][("fetch_many6",cs.signature,ss.signature)] = "{}_{}_{}_{}".format("fetch_many6", 
++                                                                    ALLOWED_IO_TYPES[data_type], 
++                                                                    ss.fetch_signature(), 
++                                                                    cs.fetch_signature())
++
++        return self._tags_fetch[tag][(fname_root,cs.signature,ss.signature)], ss, cs
++
+ 
+     def fetch_points(self, tag, time):
+         data_type = map_type[self._get_tag_type(tag)]
+@@ -209,6 +248,11 @@
+         fetch = getattr(self.raw, fetch_fname)
+         return fetch(tag, points, time, ss.raw, cs.raw)
+ 
++    def fetch_many6(self, tag, points, time1, time2, spatial_sampler, chrono_sampler):
++        fetch_fname, ss, cs = self._get_fetch_6args("fetch_many6", tag, points.dtype.type, spatial_sampler, chrono_sampler)
++        fetch = getattr(self.raw, fetch_fname)
++        return fetch(tag, points, time1, time2, ss.raw, cs.raw)
++
+     def fetch(self, *args, **kwargs):
+         tag = args[0]
+         data_type = map_type[self._get_tag_type(tag)]
+@@ -228,7 +272,24 @@
+                 barrier_time = mui4py_mod.numeric_limits_int
+             else:
+                 raise Exception("Unrecognized time type '{}'.".format(type(time).__name__))
+-            fargs = (tag, loc, time, ss.raw, cs.raw, barrier_enabled, barrier_time)
++            fargs = (tag, loc, time, ss.raw, cs.raw, barrier_enabled)
++        if len(args) == 6:
++            loc = array2Point(args[1], self.config, self.raw_point)
++            time1 = args[2]
++            time2 = args[3]
++            spatial_sampler = args[4]
++            chrono_sampler = args[5]
++            fetch_fname, ss, cs = self._get_fetch_6args("fetch", tag, data_type, spatial_sampler, chrono_sampler)
++            barrier_enabled = True
++            if type(time1).__name__ == 'float':
++                barrier_time = mui4py_mod.numeric_limits_real
++            elif type(time1).__name__ == 'int':
++                barrier_time = mui4py_mod.numeric_limits_int
++            else:
++                raise Exception("Unrecognized time1 type '{}'.".format(type(time1).__name__))
++            if type(time1).__name__ != type(time2).__name__:
++                raise Exception("time1 type '{}'. doesn't same as time2 type".format(type(time1).__name__))
++            fargs = (tag, loc, time1, time2, ss.raw, cs.raw, barrier_enabled)
+         fetch = getattr(self.raw, fetch_fname)
+         return safe_cast(self._get_tag_type(tag), fetch(*fargs))
+ 
+diff -uraN MUI-1.0/wrappers/Python/mui4py/samplers.py v1.1_dev/wrappers/Python/mui4py/samplers.py
+--- MUI-1.0/wrappers/Python/mui4py/samplers.py	2020-01-31 11:48:46.000000000 +0000
++++ v1.1_dev/wrappers/Python/mui4py/samplers.py	2020-10-27 16:20:05.000000000 +0000
+@@ -62,8 +62,8 @@
+         self._ALLOWED_IO_TYPES = [INT32, INT64, FLOAT32, FLOAT64]
+ 
+ class SamplerRbf(Sampler, CppClass):
+-    def __init__(self, r, pointvect, conservative, cutoff, polynomial):
+-        super(SamplerRbf, self).__init__(args=(r, pointvect, conservative, cutoff, polynomial))
++    def __init__(self, r, pointvect, conservative, cutoff, polynomial, fileAddress, readMatrix):
++        super(SamplerRbf, self).__init__(args=(r, pointvect, conservative, cutoff, polynomial, fileAddress, readMatrix))
+         self._ALLOWED_IO_TYPES = [INT32, INT64, FLOAT32, FLOAT64]
+ 
+ # Chrono samplers

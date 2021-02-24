@@ -1,0 +1,32 @@
+sinclude $(GENERAL_RULES)/mplib$(WM_MPLIB)
+sinclude $(RULES)/mplib$(WM_MPLIB)
+sinclude $(GENERAL_RULES)/MUI
+
+EXE_INC = \
+    $(PFLAGS) \
+    $(PINC) \
+    ${MUI_INC} \
+    -I$(LIB_SRC)/TurbulenceModels/turbulenceModels/lnInclude \
+    -I$(LIB_SRC)/TurbulenceModels/incompressible/lnInclude \
+    -I$(LIB_SRC)/transportModels \
+    -I$(LIB_SRC)/transportModels/incompressible/singlePhaseTransportModel \
+    -I$(LIB_SRC)/finiteVolume/lnInclude \
+    -I$(LIB_SRC)/sampling/lnInclude \
+    -I$(LIB_SRC)/dynamicFvMesh/lnInclude \
+    -I$(LIB_SRC)/dynamicMesh/lnInclude \
+    -I$(LIB_SRC)/meshTools/lnInclude \
+    -I../../../../../../../../MUI/couplingFSILab \
+    -I../../../../../../../../fenics2019_eCSE_FSI/thirdParty/eigen-3.3.9 \
+
+EXE_LIBS = \
+    $(PLIBS) \
+    -lturbulenceModels \
+    -lincompressibleTurbulenceModels \
+    -lincompressibleTransportModels \
+    -lfiniteVolume \
+    -lfvOptions \
+    -lsampling \
+    -ldynamicFvMesh \
+    -ltopoChangerFvMesh \
+    -ldynamicMesh \
+    -lmeshTools
