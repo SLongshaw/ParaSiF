@@ -1,22 +1,22 @@
 # ParMupSiF - Parallel Partitioned Multi-physical Simulation Framework
 
-Parallel Partitioned Multi-physical Simulation Framework is developed based on the MUI library and offers a platform where users can carry out multi-physical (mainly fluid-structure interaction) studies with High Performance Computers.
+Parallel Partitioned Multi-physical Simulation Framework is developed based on the MUI library. It offers a platform where users can carry out multi-physical (mainly fluid-structure interaction) studies using supercomputers.
 
-The framework uses partitioned approach to couple two or more physical domains together for a multi-physical simulation. It takes several advantages of the MUI library:
+The framework uses a partitioned approach to couple two or more physical domains together for multi-physics simulations. It takes several advantages of the MUI library:
 
-• Flexible of select solvers for each physical domain;
+• Flexibility to select different solvers for each physical domain;
 
-• Flexible of extend the number of physical domains;
+• Flexibility to extend the number of physical domains;
 
 • Good scalability on communications among physical domains for large simulations;
 
-• Keep development of the coupled solvers decoupled. It allows for easier independent testing of each solver and avoid potential incompatibilities between two solvers (i.e if they both use a certain library X each one depends on a different version of it which are not compatible);
+• Keeping the development of the coupled solvers decoupled. It allows for easier independent testing of each solver and avoids potential incompatibilities between two solvers (i.e if they both use a certain library X each one depends on a different version of it which are not compatible);
 
-• Couple two solvers which have two different programming language interfaces(e.g C++ and Python);
+• Coupling of multiple solvers which have different programming language interfaces (e.g C, C++, FORTRAN and Python);
 
 • "Plug and play" strategy. One solver can be replaced by another incrementally and without the need of recompiling if the MUI interface is used as a common adaptor;
 
-• Use two solvers which have two incompatible licenses exploiting the dual licensing of the MUI library (both solvers are never mixed source-wise or binary-wise).
+• Use of multiple solvers which have two incompatible licenses exploiting the dual licensing of the MUI library (both solvers are never mixed source-wise or binary-wise).
 
 **This framework is a beta software at the moment and under active development** to involve more solvers as well as more physical domains. Such infrastructure will make it possible to simulate large multi-physical problems and simulate complicated multi-physical cases by using supercomputing facilities.
 
@@ -28,11 +28,14 @@ This code is licensed under the GNU General Public License version 3
 
 The Parallel Partitioned Multi-physical Simulation Framework provides FEniCS v2019.1.0 <-> MUI v1.0 <-> OpenFOAM v6 two-way coupling.
 
+## Acknowledgements
+The Parallel Partitioned Multi-physical Simulation Framework is developed at the [Scientific Computing Department](https://www.scd.stfc.ac.uk/) of the [Science and Technology Facilities Council](https://stfc.ukri.org/). If you this framework, please cite us:
+
+*Liu, W., Wang, W., Skillen, A., Longshaw, S.M., Moulinec, C. and Emerson, D.R. (2021). A Parallel Partitioned Approach on Fluid-Structure Interaction Simulation Using the Multiscale Universal Interface Coupling Library. In: 14th World Congress In Computational Mechanics (WCCM) And ECCOMAS Congress 2020.*
+
 ## Publication
 
 Liu, W., Wang, W., Skillen, A., Longshaw, S.M., Moulinec, C. and Emerson, D.R. (2021). A Parallel Partitioned Approach on Fluid-Structure Interaction Simulation Using the Multiscale Universal Interface Coupling Library. In: 14th World Congress In Computational Mechanics (WCCM) And ECCOMAS Congress 2020.
-
-Liu, W., Longshaw, S.M., Skillen, A., Emerson, D.R., Valente, C. and Gambioli, F. (under review). A High-Performance Open-Source Solution for Multiphase Fluid-Structure Interaction. In: 31st International Ocean and Polar Engineering Conference (ISOPE).
 
 Liu, W., Wang, W., Skillen, A., Fernandez, E.R., Longshaw, S. and Sawko, R. (2020). Code Development on Parallel Partitioned Fluid-Structure Interaction Simulations. Project Report. [online] STFC e-Pub. Available at: https://epubs.stfc.ac.uk/work/46400815.
 
@@ -44,7 +47,9 @@ Should you have any question please do not hesitate to contact the developers
 
 **Step One: Install FEniCS v2019.0.1**
 
-Please follow the instruction from FEniCS Prjoect Manual: https://fenics.readthedocs.io/en/latest/installation.html#from-source
+Please follow the instruction from FEniCS Prjoect Manual to install the FEniCS version 2019.1.0, which was released on April 19th 2019: https://fenicsproject.org/download/
+
+If building FEniCS from source, please refer to the **Stable version** section to install the latest stable release of FEniCS (version 2019.1.0) from [this link](https://fenics.readthedocs.io/en/latest/installation.html#from-source)
 
 **Step Two: Obtain MUI and install FSI coupling lab and wrappers**
 
@@ -126,4 +131,4 @@ export PYTHONPATH= /path/to/parMupSiF/src/CSM/FEniCS/V2019.1.0:$PYTHONPATH
 
 ## Demos
 
-demos on both the single phase FSI demo case and the multiphase FSI demo case are in parMupSiF/demo/
+Demos of both the single phase FSI case (3-D flow past a flexible beam) and the multiphase FSI case (3-D dam break with a flexible beam) are in parMupSiF/demo/FSIBeam_pimpleFSIFoam and parMupSiF/demo/FSIBeam_interFSIFoam, respectively.
