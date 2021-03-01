@@ -98,9 +98,18 @@ mv ThirdParty-6-version-6 ThirdParty-6
 cp ../../parMupSiF/src/MUI_Utility/OpenFOAM_patch/* ./
 
 ./patch_OF6-MUI
+```
 
+Please place a symlink with absolute path to the MUI library into the new folder "ThirdParty-6/MUI" before move forward.
+
+Please note: 1. make sure the symlink to the MUI library is not relative path as a script takes a copy of these files; 2. Whenever MUI has been updated, the old platform files of OpenFOAM need to be cleaned and re-run Allwmake to update the copy that gets used by the OpenFOAM applications.
+
+For more information, please refere to parMupSiF/src/MUI_Utility/OpenFOAM_patch/README, OpenFOAM-6/README-MUI and ThirdParty-6/README-MUI
+
+```bash
 source OpenFOAM-6/etc/bashrc
 cd OpenFOAM-6
+
 
 ./Allwmake
 
