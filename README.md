@@ -67,6 +67,11 @@ cd ../../../MUI/wrappers/C
 make
 
 cd ../Python
+```
+In here, we need to change the Makefile in the MUI/wrappers/Python folder, by relpace Line 5 from "USE_RBF = False" to "USE_RBF = True"
+Then:
+
+```
 make COMPILER=GCC package
 make pip-install
 
