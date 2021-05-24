@@ -36,7 +36,7 @@ maxCo             0.2;
 maxDeltaT         1.0E-00;
 libs
 (
-    "libParmupsifBoundaryCondition.so"
+
 );
 
 //###########################################################################//
