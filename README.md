@@ -35,6 +35,8 @@ The Parallel Partitioned Multi-physical Simulation Framework is developed at the
 
 ## Publication
 
+Liu, W., Longshaw, S.M., Skillen, A., Emerson, D.R., Valente, C. and Gambioli, F. (2021). A High-Performance Open-Source Solution for Multiphase Fluid-Structure Interaction. In: 31st International Ocean and Polar Engineering Conference (ISOPE).
+
 Liu, W., Wang, W., Skillen, A., Longshaw, S.M., Moulinec, C. and Emerson, D.R. (2021). A Parallel Partitioned Approach on Fluid-Structure Interaction Simulation Using the Multiscale Universal Interface Coupling Library. In: 14th World Congress In Computational Mechanics (WCCM) And ECCOMAS Congress 2020.
 
 Liu, W., Wang, W., Skillen, A., Fernandez, E.R., Longshaw, S. and Sawko, R. (2020). Code Development on Parallel Partitioned Fluid-Structure Interaction Simulations. Project Report. [online] STFC e-Pub. Available at: https://epubs.stfc.ac.uk/work/46400815.
@@ -55,13 +57,13 @@ If building FEniCS from source, please refer to the **Stable version** section t
 
 ```bash
 cd parMupSiF/src/MUI_Utility
-wget https://github.com/MxUI/MUI/archive/1.1.tar.gz
-tar -xzf 1.1.tar.gz
-cd MUI-1.1/
+wget https://github.com/MxUI/MUI/archive/1.1.1.tar.gz
+tar -xzf 1.1.1.tar.gz
+cd MUI-1.1.1/
 cp -r ../couplingFSILab ./
 cd ..
-rm 1.1.tar.gz
-mv MUI-1.1/ ../../../MUI
+rm 1.1.1.tar.gz
+mv MUI-1.1.1/ ../../../MUI
 
 cd ../../../MUI/wrappers/C
 make
