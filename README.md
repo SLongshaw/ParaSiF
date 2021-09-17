@@ -57,13 +57,13 @@ If building FEniCS from source, please refer to the **Stable version** section t
 
 ```bash
 cd parMupSiF/src/MUI_Utility
-wget https://github.com/MxUI/MUI/archive/1.1.1.tar.gz
-tar -xzf 1.1.1.tar.gz
-cd MUI-1.1.1/
+wget https://github.com/MxUI/MUI/archive/1.1.2.tar.gz
+tar -xzf 1.1.2.tar.gz
+cd MUI-1.1.2/
 cp -r ../couplingFSILab ./
 cd ..
-rm 1.1.1.tar.gz
-mv MUI-1.1.1/ ../../../MUI
+rm 1.1.2.tar.gz
+mv MUI-1.1.2/ ../../../MUI
 
 cd ../../../MUI/wrappers/C
 make
