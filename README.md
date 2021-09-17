@@ -26,7 +26,7 @@ Copyright (C) 2021 Engineering and Environment Group, Scientific Computing Depar
 
 This code is licensed under the GNU General Public License version 3
 
-The Parallel Partitioned Multi-physical Simulation Framework provides FEniCS v2019.1.0 <-> MUI v1.0 <-> OpenFOAM v6 two-way coupling.
+The Parallel Partitioned Multi-physical Simulation Framework provides FEniCS v2019.1.0 <-> MUI v1.1.2 <-> OpenFOAM v6 two-way coupling.
 
 ## Acknowledgements
 The Parallel Partitioned Multi-physical Simulation Framework is developed at the [Scientific Computing Department](https://www.scd.stfc.ac.uk/) of the [Science and Technology Facilities Council](https://stfc.ukri.org/). If you this framework, please cite us:
@@ -57,13 +57,13 @@ If building FEniCS from source, please refer to the **Stable version** section t
 
 ```bash
 cd parMupSiF/src/MUI_Utility
-wget https://github.com/MxUI/MUI/archive/1.1.1.tar.gz
-tar -xzf 1.1.1.tar.gz
-cd MUI-1.1.1/
+wget https://github.com/MxUI/MUI/archive/1.1.2.tar.gz
+tar -xzf 1.1.2.tar.gz
+cd MUI-1.1.2/
 cp -r ../couplingFSILab ./
 cd ..
-rm 1.1.1.tar.gz
-mv MUI-1.1.1/ ../../../MUI
+rm 1.1.2.tar.gz
+mv MUI-1.1.2/ ../../../MUI
 
 cd ../../../MUI/wrappers/C
 make
