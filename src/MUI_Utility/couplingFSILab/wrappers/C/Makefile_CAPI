@@ -7,7 +7,7 @@ CICODEPATH = -I../../
 CIEIGENPATH =
 CIMUIPATH = -I../../../wrappers/C -I../../../
 CLPATH = -L../../ -L../../../wrappers/C
-CLNAME = -lwrapperC 
+CLNAME = -lmui_c_wrapper 
 LDFLAGS = -lstdc++
 
 
