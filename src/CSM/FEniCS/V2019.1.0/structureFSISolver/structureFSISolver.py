@@ -123,6 +123,10 @@ class StructureFSISolver:
         self.fetchExtendRBF = float(self.configure['MUI']['fetchExtendRBF'])
         # F-Switch off the RBF spatial sampler polynomial terms; T-Switch on the RBF spatial sampler polynomial terms.
         self.iPolynomial = self.configure['MUI'].getboolean('iPolynomial')
+        # Select of basis functions of the RBF spatial sampler (integer)
+        self.basisFunc = int(self.configure['MUI']['basisFunc'])
+        # F-Switch off the RBF spatial sampler smooth function; T-Switch on the RBF spatial sampler smooth function.
+        self.iSmoothFunc = self.configure['MUI'].getboolean('iSmoothFunc')
         # Numbers of time steps to forget for MUI push (integer)
         self.forgetTStepsMUI = int(self.configure['MUI']['forgetTStepsMUI'])
         # ipushLimitMUI
@@ -554,7 +558,16 @@ class StructureFSISolver:
             fileAddress=self.outputFolderName
 
         Temporal_sampler = mui4py.ChronoSamplerExact()
-        Spatial_sampler = mui4py.SamplerRbf(self.rMUIFetcher, point3dLists, self.iConservative, self.cutoffRBF, self.iPolynomial, fileAddress, self.iReadMatrix)
+        # Spatial_sampler = mui4py.SamplerRbf(self.rMUIFetcher, point3dLists, self.iConservative, self.cutoffRBF, self.iPolynomial, fileAddress, self.iReadMatrix)
+        Spatial_sampler = mui4py.SamplerRbf(self.rMUIFetcher, 
+                                                point3dList, 
+                                                self.basisFunc, 
+                                                self.iConservative, 
+                                                self.iPolynomial, 
+                                                self.iSmoothFunc, 
+                                                self.iReadMatrix, 
+                                                fileAddress, 
+                                                self.cutoffRBF)
 
         if self.MPI_Get_Rank(MPI_COMM_WORLD) == 0: print ("{FENICS} Done")
 
