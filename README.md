@@ -74,7 +74,7 @@ make
 
 cd ../Python
 
-make USE_RBF=1 INC_EIGEN=/lus/cls01095/work/c01/c01/wendiliu/app_test2/FEniCS/V2019.1.0/eigen-3.3.9 INC_PYBIND+=-I/opt/cray/pe/python/3.8.5.0/include/python3.8 INC_PYBIND+=-I/lus/cls01095/work/c01/c01/wendiliu/app_test2/FEniCS/V2019.1.0/pybind11-2.6.1/include CXX=CC package
+make USE_RBF=1 INC_EIGEN=/path/to/eigen package
 make pip-install
 
 cd ../../couplingFSILab/wrappers/C
