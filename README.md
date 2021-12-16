@@ -1,4 +1,4 @@
-# ParMupSiF - Parallel Partitioned Multi-physical Simulation Framework
+# ParaSiF - Parallel Partitioned Multi-physical Simulation Framework
 
 Parallel Partitioned Multi-physical Simulation Framework is developed based on the MUI library. It offers a platform where users can carry out multi-physical (mainly fluid-structure interaction) studies using supercomputers.
 
@@ -26,14 +26,18 @@ Copyright (C) 2021 Engineering and Environment Group, Scientific Computing Depar
 
 This code is licensed under the GNU General Public License version 3
 
-The Parallel Partitioned Multi-physical Simulation Framework provides FEniCS v2019.1.0 <-> MUI v1.1.2 <-> OpenFOAM v6 two-way coupling.
+The Parallel Partitioned Multi-physical Simulation Framework provides FEniCS v2019.1.0 <-> MUI v1.0 <-> OpenFOAM v6 two-way coupling.
 
 ## Acknowledgements
-The Parallel Partitioned Multi-physical Simulation Framework is developed at the [Scientific Computing Department](https://www.scd.stfc.ac.uk/) of the [Science and Technology Facilities Council](https://stfc.ukri.org/). If you this framework, please cite us:
+The Parallel Partitioned Multi-physical Simulation Framework is developed at the [Scientific Computing Department](https://www.scd.stfc.ac.uk/) of the [Science and Technology Facilities Council](https://stfc.ukri.org/). If you use this framework, please cite us:
+
+*Liu, W., Longshaw, S., Skillen, A., Emerson, D.R., Valente, C. and Gambioli, F. (in press). A High-performance Open-source Solution for Multiphase Fluid-Structure Interaction. International Journal of Offshore and Polar Engineering.
 
 *Liu, W., Wang, W., Skillen, A., Longshaw, S.M., Moulinec, C. and Emerson, D.R. (2021). A Parallel Partitioned Approach on Fluid-Structure Interaction Simulation Using the Multiscale Universal Interface Coupling Library. In: 14th World Congress In Computational Mechanics (WCCM) And ECCOMAS Congress 2020.*
 
 ## Publication
+
+Liu, W., Longshaw, S., Skillen, A., Emerson, D.R., Valente, C. and Gambioli, F. (in press). A High-performance Open-source Solution for Multiphase Fluid-Structure Interaction. International Journal of Offshore and Polar Engineering.
 
 Liu, W., Longshaw, S.M., Skillen, A., Emerson, D.R., Valente, C. and Gambioli, F. (2021). A High-Performance Open-Source Solution for Multiphase Fluid-Structure Interaction. In: 31st International Ocean and Polar Engineering Conference (ISOPE).
 
@@ -57,24 +61,20 @@ If building FEniCS from source, please refer to the **Stable version** section t
 
 ```bash
 cd parMupSiF/src/MUI_Utility
-wget https://github.com/MxUI/MUI/archive/1.1.2.tar.gz
-tar -xzf 1.1.2.tar.gz
-cd MUI-1.1.2/
+wget https://github.com/MxUI/MUI/archive/1.2.tar.gz
+tar -xzf 1.2.tar.gz
+cd MUI-1.2/
 cp -r ../couplingFSILab ./
 cd ..
-rm 1.1.2.tar.gz
-mv MUI-1.1.2/ ../../../MUI
+rm 1.2.tar.gz
+mv MUI-1.2/ ../../../MUI
 
 cd ../../../MUI/wrappers/C
 make
 
 cd ../Python
-```
-In here, we need to change the Makefile in the MUI/wrappers/Python folder, by relpace Line 5 from "USE_RBF = False" to "USE_RBF = True"
-Then:
 
-```
-make COMPILER=GCC package
+make USE_RBF=1 INC_EIGEN=/lus/cls01095/work/c01/c01/wendiliu/app_test2/FEniCS/V2019.1.0/eigen-3.3.9 INC_PYBIND+=-I/opt/cray/pe/python/3.8.5.0/include/python3.8 INC_PYBIND+=-I/lus/cls01095/work/c01/c01/wendiliu/app_test2/FEniCS/V2019.1.0/pybind11-2.6.1/include CXX=CC package
 make pip-install
 
 cd ../../couplingFSILab/wrappers/C
@@ -141,7 +141,7 @@ wmake interFSIFoam
 ```bash
 source /path/to/dolfin/dolfin.conf
 source /path/to/OpenFOAM-6/etc/bashrc
-export PYTHONPATH= /path/to/parMupSiF/src/CSM/FEniCS/V2019.1.0:$PYTHONPATH
+export PYTHONPATH=/path/to/parMupSiF/src/CSM/FEniCS/V2019.1.0:$PYTHONPATH
 ```
 
 ## Demos
