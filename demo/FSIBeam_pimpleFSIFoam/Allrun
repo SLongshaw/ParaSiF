@@ -28,9 +28,9 @@ cd ../../
 # Pre-processing
 ./runCtrl/preProcess
 
-echo -n "parMupSiF running..."
+echo -n "ParaSiF running..."
 
-# parMupSiF case with OpenFOAM_MUI(C++)_MUI(python)_FEniCS parallel run
+# ParaSiF case with OpenFOAM_MUI(C++)_MUI(python)_FEniCS parallel run
 mpirun -np ${numProcsFluid} -wdir ${domainFluid} ${solverFluid} -parallel -coupled :\
        -np ${numProcsStructure} -wdir ${domainStructure} python3 -m mpi4py ${solverStructure}\
         > runData/logFiles/log.foamRun 2>&1 | tail -f runData/logFiles/log.foamRun

@@ -19,8 +19,8 @@ EXE_INC = \
     -I$(LIB_SRC)/dynamicMesh/lnInclude \
     -I$(LIB_SRC)/meshTools/lnInclude \
     -I$(LIB_SRC)/sampling/lnInclude \
-	-I../../../../../../../../MUI/couplingFSILab \
-    -I../../../../../../../../fenics2019_eCSE_FSI/thirdParty/eigen-3.3.9 \
+	-I../../../../../../../../MUI/MUI-1.2/couplingFSILab \
+    -I../../../../../../../../FEniCS/V2019.1.0/eigen-3.3.9 \
 
 EXE_LIBS = \
     $(PLIBS) \

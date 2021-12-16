@@ -60,7 +60,7 @@ If building FEniCS from source, please refer to the **Stable version** section t
 **Step Two: Obtain MUI and install FSI coupling lab and wrappers**
 
 ```bash
-cd parMupSiF/src/MUI_Utility
+cd ParaSiF/src/MUI_Utility
 wget https://github.com/MxUI/MUI/archive/1.2.tar.gz
 tar -xzf 1.2.tar.gz
 cd MUI-1.2/
@@ -81,9 +81,9 @@ cd ../../couplingFSILab/wrappers/C
 make -f Makefile_CAPI
 
 cd ../Python
-make COMPILER=GCC package
+make COMPILER=GNU package
 make pip-install
-cd ../../../../parMupSiF/src/MUI_Utility
+cd ../../../../ParaSiF/src/MUI_Utility
 ```
 
 For more information on MUI, please refer to the MxUI GitHub organisation pages https://github.com/MxUI
@@ -101,7 +101,7 @@ wget -O - http://dl.openfoam.org/third-party/6 | tar xvz
 mv OpenFOAM-6-version-6 OpenFOAM-6
 mv ThirdParty-6-version-6 ThirdParty-6
 
-cp ../../parMupSiF/src/MUI_Utility/OpenFOAM_patch/* ./
+cp ../../ParaSiF/src/MUI_Utility/OpenFOAM_patch/* ./
 
 ./patch_OF6-MUI
 ```
@@ -110,7 +110,7 @@ Please place a symlink with absolute path to the MUI library into the new folder
 
 Please note: 1. make sure the symlink to the MUI library is not relative path as a script takes a copy of these files; 2. Whenever MUI has been updated, the old platform files of OpenFOAM need to be cleaned and re-run Allwmake to update the copy that gets used by the OpenFOAM applications.
 
-For more information, please refere to parMupSiF/src/MUI_Utility/OpenFOAM_patch/README, OpenFOAM-6/README-MUI and ThirdParty-6/README-MUI
+For more information, please refere to ParaSiF/src/MUI_Utility/OpenFOAM_patch/README, OpenFOAM-6/README-MUI and ThirdParty-6/README-MUI
 
 ```bash
 source OpenFOAM-6/etc/bashrc
@@ -119,11 +119,11 @@ cd OpenFOAM-6
 
 ./Allwmake
 
-cd ../../../parMupSiF/src/MUI_Utility
+cd ../../../ParaSiF/src/
 ```
 For more information on OpenFOAM v6, please refer to the OpenFOAM Foundation: https://openfoam.org/download/6-source/
 
-**Step Four: Install parMupSiF OpenFOAM solvers**
+**Step Four: Install ParaSiF OpenFOAM solvers**
 
 ```bash
 cd ../CFD/OpenFOAM/V6/applications/solvers/
@@ -131,17 +131,17 @@ cd ../CFD/OpenFOAM/V6/applications/solvers/
 # Source OpenFOAM run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
-# Compile parMupSiF solvers
+# Compile ParaSiF solvers
 wmake pimpleFSIFoam
 wmake interFSIFoam
 ```
 
-## Source and export before run parMupSiF cases
+## Source and export before run ParaSiF cases
 
 ```bash
 source /path/to/dolfin/dolfin.conf
 source /path/to/OpenFOAM-6/etc/bashrc
-export PYTHONPATH=/path/to/parMupSiF/src/CSM/FEniCS/V2019.1.0:$PYTHONPATH
+export PYTHONPATH=/path/to/ParaSiF/src/CSM/FEniCS/V2019.1.0:$PYTHONPATH
 ```
 
 ## Demos
