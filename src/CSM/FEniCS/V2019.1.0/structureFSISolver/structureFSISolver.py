@@ -1,5 +1,5 @@
 """ 
-    Parallel Partitioned Multi-physical Simulation Framework (parMupSiF)
+    Parallel Partitioned Multi-physical Simulation Framework (ParaSiF)
 
     Copyright (C) 2021 Engineering and Environment Group, Scientific 
     Computing Department, Science and Technology Facilities Council, 
@@ -405,6 +405,8 @@ class StructureFSISolver:
 
         import mui4py
 
+        synchronised=False
+
         send_min_X = sys.float_info.max
         send_min_Y = sys.float_info.max
         send_min_Z = sys.float_info.max
@@ -456,7 +458,7 @@ class StructureFSISolver:
                                         [send_max_X, send_max_Y, send_max_Z])
 
         # Announce the MUI send span
-        MUI_Interfaces["threeDInterface0"].announce_send_span(0, Total_Time_Steps, span_push)
+        MUI_Interfaces["threeDInterface0"].announce_send_span(0, Total_Time_Steps, span_push, synchronised)
 
         recv_min_X = sys.float_info.max
         recv_min_Y = sys.float_info.max
@@ -516,7 +518,7 @@ class StructureFSISolver:
         span_fetch = mui4py.geometry.Box([recv_min_X, recv_min_Y, recv_min_Z],
                                          [recv_max_X, recv_max_Y, recv_max_Z])
         # Announce the MUI receive span
-        MUI_Interfaces["threeDInterface0"].announce_recv_span(0, Total_Time_Steps, span_fetch)
+        MUI_Interfaces["threeDInterface0"].announce_recv_span(0, Total_Time_Steps, span_fetch, synchronised)
 
         print("{FENICS} at rank: ", MPI_COMM_WORLD.Get_rank(), " send_max_X: ", send_max_X, " send_min_X: ", send_min_X)
         print("{FENICS} at rank: ", MPI_COMM_WORLD.Get_rank(), " send_max_Y: ", send_max_Y, " send_min_Y: ", send_min_Y)

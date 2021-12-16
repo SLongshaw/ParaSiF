@@ -1,6 +1,6 @@
-COMPILER ?= GCC
+COMPILER ?= GNU
 CC	= mpic++
-CFLAGS	= -Wall -std=c++11 -O3
+CFLAGS	= -Wall -std=c++11 -O3 -Wno-unused-local-typedefs -Wno-comment -Wno-reorder -fpermissive
 LDFLAGS = -shared
 include $(COMPILER).make
 INC_MPI4PY = -I$(shell python3 -c "import mpi4py;print(mpi4py.get_include())")
