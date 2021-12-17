@@ -69,7 +69,7 @@ cd ..
 rm 1.2.tar.gz
 mv MUI-1.2/ ../../../MUI
 
-cd ../../../MUI/wrappers/C
+cd ../../../MUI/MUI-1.2/wrappers/C
 make
 
 cd ../Python
@@ -83,7 +83,7 @@ make -f Makefile_CAPI
 cd ../Python
 make COMPILER=GNU package
 make pip-install
-cd ../../../../ParaSiF/src/MUI_Utility
+cd ../../../../../ParaSiF/src
 ```
 
 For more information on MUI, please refer to the MxUI GitHub organisation pages https://github.com/MxUI
@@ -91,7 +91,7 @@ For more information on MUI, please refer to the MxUI GitHub organisation pages 
 **Step Three: Install OpenFOAM v6 with MUI patches**
 
 ```bash
-cd ../../../
+cd ../../
 mkdir -p OpenFOAM/v6
 cd OpenFOAM/v6
 
