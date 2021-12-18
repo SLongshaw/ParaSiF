@@ -1,14 +1,14 @@
-# ParaSiF - Parallel Partitioned Multi-physical Simulation Framework
+# ParaSiF - Parallel Partitioned Multi-physics Simulation Framework
 
-Parallel Partitioned Multi-physical Simulation Framework is developed based on the MUI library. It offers a platform where users can carry out multi-physical (mainly fluid-structure interaction) studies using supercomputers.
+Parallel Partitioned Multi-physics Simulation Framework is developed based on the MUI library. It offers a platform where users can carry out multi-physics (mainly fluid-structure interaction) studies using supercomputers.
 
-The framework uses a partitioned approach to couple two or more physical domains together for multi-physics simulations. It takes several advantages of the MUI library:
+The framework uses a partitioned approach to couple two or more physics domains together for multi-physics simulations. It takes several advantages of the MUI library:
 
-• Flexibility to select different solvers for each physical domain;
+• Flexibility to select different solvers for each physics domain;
 
-• Flexibility to extend the number of physical domains;
+• Flexibility to extend the number of physics domains;
 
-• Good scalability on communications among physical domains for large simulations;
+• Good scalability on communications among physics domains for large simulations;
 
 • Keeping the development of the coupled solvers decoupled. It allows for easier independent testing of each solver and avoids potential incompatibilities between two solvers (i.e if they both use a certain library X each one depends on a different version of it which are not compatible);
 
@@ -18,7 +18,7 @@ The framework uses a partitioned approach to couple two or more physical domains
 
 • Use of multiple solvers which have two incompatible licenses exploiting the dual licensing of the MUI library (both solvers are never mixed source-wise or binary-wise).
 
-**This framework is a beta software at the moment and under active development** to involve more solvers as well as more physical domains. Such infrastructure will make it possible to simulate large multi-physical problems and simulate complicated multi-physical cases by using supercomputing facilities.
+**This framework is a beta software at the moment and under active development** to involve more solvers as well as more physics domains. Such infrastructure will make it possible to simulate large multi-physics problems and simulate complicated multi-physics cases by using supercomputing facilities.
 
 ## Licensing
 
@@ -26,10 +26,10 @@ Copyright (C) 2021 Engineering and Environment Group, Scientific Computing Depar
 
 This code is licensed under the GNU General Public License version 3
 
-The Parallel Partitioned Multi-physical Simulation Framework provides FEniCS v2019.1.0 <-> MUI v1.0 <-> OpenFOAM v6 two-way coupling.
+The Parallel Partitioned Multi-physics Simulation Framework provides FEniCS v2019.1.0 <-> MUI v1.0 <-> OpenFOAM v6 two-way coupling.
 
 ## Acknowledgements
-The Parallel Partitioned Multi-physical Simulation Framework is developed at the [Scientific Computing Department](https://www.scd.stfc.ac.uk/) of the [Science and Technology Facilities Council](https://stfc.ukri.org/). If you use this framework, please cite us:
+The Parallel Partitioned Multi-physics Simulation Framework is developed at the [Scientific Computing Department](https://www.scd.stfc.ac.uk/) of the [Science and Technology Facilities Council](https://stfc.ukri.org/). If you use this framework, please cite us:
 
 *Liu, W., Longshaw, S., Skillen, A., Emerson, D.R., Valente, C. and Gambioli, F. (in press). A High-performance Open-source Solution for Multiphase Fluid-Structure Interaction. International Journal of Offshore and Polar Engineering.
 
