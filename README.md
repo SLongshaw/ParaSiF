@@ -157,9 +157,13 @@ To run the demo cases, execute the Allrun script.
 A new subfolder runData will be generated during runtime, which contains output files (such as checkpoint data, probs, forces, etc) generated from both the fluid and structure domain.
 
 In runData/structureDomain/structureResults: 
+
 • checkpointData_XXX.h5 is the checkpoint data for structure domain, which the XXX is the time name of the checkpoint data;
+
 • displacementXXX.vtu, stressXXX.vtu and surface_traction_structureXXX.vtu are VTU format files on displacement, stress and surface traction of the structure domain, respectively. The XXX is the time-step name.
+
 • displacement.pvd, stress.pvd and surface_traction_structure.pvd are PVD format files on displacement, stress and surface traction of the structure domain, respectively. These usually the file for post-process visualation (such as read by ParaView). 
+
 • tip-displacementX_0.txt is the TXT format file on the displacement of the probed point (defined in structureInputPara.ini, POSTPROCESS section, pointMoniX/pointMoniY/pointMoniZ variables). The 'X' in the 'tip-displacementX_0.txt' indicates that the data is about the x-axis displacement, and the '0' means it is the output from rank0 of the parallel simulation.
 
 To restart: 
