@@ -1,5 +1,5 @@
 /*---------------------------------------------------------------------------*\
-    Parallel Partitioned Multi-physical Simulation Framework (parMupSiF)
+    Parallel Partitioned Multi-physical Simulation Framework (ParaSiF)
 
     Copyright (C) 2021 Engineering and Environment Group, Scientific 
     Computing Department, Science and Technology Facilities Council, 

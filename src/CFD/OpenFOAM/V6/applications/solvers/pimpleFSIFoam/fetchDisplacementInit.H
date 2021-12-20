@@ -1,5 +1,5 @@
 /*---------------------------------------------------------------------------*\
-    Parallel Partitioned Multi-physical Simulation Framework (parMupSiF)
+    Parallel Partitioned Multi-physical Simulation Framework (ParaSiF)
 
     Copyright (C) 2021 Engineering and Environment Group, Scientific 
     Computing Department, Science and Technology Facilities Council, 
@@ -191,7 +191,7 @@
 #ifdef USE_MUI // included if the switch -DUSE_MUI included during compilation.
 
     // define spatial and temporal samplers
-    mui::sampler_pseudo_nearest2_linear3d<double> spatial_sampler(rSampler);
+    mui::sampler_pseudo_n2_linear3d<double> spatial_sampler(rSampler);
     mui::chrono_sampler_exact3d chrono_sampler;
 
     std::vector<muiCoupling::muiCouplingAitken> AK; 
