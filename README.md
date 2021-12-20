@@ -169,8 +169,8 @@ In runData/structureDomain/structureResults:
 To restart: 
 1. Follow the OpenFOAM restart procedure to set the runData/fluidDomain subfolder; 
 2. Copy the checkpoint data with the time name you want from the runData/structureDomain/structureResults to the subfolder runData/structureDomain/dataInput (for example, if we want to restart at t=0.01, checkpointData_0.01.h5 need to be copied to dataInput subfolder);
-3. Change the parameter 'iContinueRun' into 'True' in the 'TIME' section of the structure input file runData/structureDomain/structureFSISetup/structureInputPara.ini;
-4. Rename dataInput/checkpointData_XXX.h5 into dataInput/checkpointData.h5 (i.e. remove the time name of the checkpoint data. for example, change the name of dataInput/checkpointData_0.01.h5 into dataInput/checkpointData.h5);
+3. Rename dataInput/checkpointData_XXX.h5 into dataInput/checkpointData.h5 (i.e. remove the time name of the checkpoint data. for example, change the name of dataInput/checkpointData_0.01.h5 into dataInput/checkpointData.h5);
+4. Change the parameter 'iContinueRun' into 'True' in the 'TIME' section of the structure input file runData/structureDomain/structureFSISetup/structureInputPara.ini;
 5. (Optional) To avoide overwrite of the previous calculated data, re-name the runData/structureDomain/structureResults;
 6. In 'Allrun', comment out './runCtrl/runDataFolderCreation' as the subfolder 'runData' has already created in previous run; comment out './runCtrl/preProcess' as we don't need OpenFOAM pre-processes (mesh generation, setFields, decomposePar, etc) in restart.
 7. Execute the updated Allrun script.
