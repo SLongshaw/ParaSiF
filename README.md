@@ -148,4 +148,24 @@ export PYTHONPATH=/path/to/ParaSiF/src/CSM/FEniCS/V2019.1.0:$PYTHONPATH
 
 ## Demos
 
-Demos of both the single phase FSI case (3-D flow past a flexible beam) and the multiphase FSI case (3-D dam break with a flexible beam) are in parMupSiF/demo/FSIBeam_pimpleFSIFoam and parMupSiF/demo/FSIBeam_interFSIFoam, respectively.
+Demos of both the single phase FSI case (3-D flow past a flexible beam) and the multiphase FSI case (3-D dam break with a flexible beam) are in ParaSiF/demo/FSIBeam_pimpleFSIFoam and ParaSiF/demo/FSIBeam_interFSIFoam, respectively.
+
+In the demo folde, the subfolder caseSetup contains the input files for both fluid and structure domain, the subfolder runCtrl contains scripts for the case execution.
+
+To run the demo cases, execute the Allrun script.
+
+A new subfolder runData will be generated during runtime, which contains output files (such as checkpoint data, probs, forces, etc) generated from both the fluid and structure domain.
+
+In runData/structureDomain/structureResults: 
+• checkpointData_XXX.h5 is the checkpoint data for structure domain, which the XXX is the time name of the checkpoint data;
+• displacementXXX.vtu, stressXXX.vtu and surface_traction_structureXXX.vtu are VTU format files on displacement, stress and surface traction of the structure domain, respectively. The XXX is the time-step name.
+• displacement.pvd, stress.pvd and surface_traction_structure.pvd are PVD format files on displacement, stress and surface traction of the structure domain, respectively. These usually the file for post-process visualation (such as read by ParaView). 
+• tip-displacementX_0.txt is the TXT format file on the displacement of the probed point (defined in structureInputPara.ini, POSTPROCESS section, pointMoniX/pointMoniY/pointMoniZ variables). The 'X' in the 'tip-displacementX_0.txt' indicates that the data is about the x-axis displacement, and the '0' means it is the output from rank0 of the parallel simulation.
+
+To restart: 
+1. follow the OpenFOAM restart procedure to set the runData/fluidDomain subfolder; 
+2. copy the checkpoint data with the time name you want from the runData/structureDomain/structureResults to the subfolder runData/structureDomain/dataInput (for example, if we want to restart at t=0.01, checkpointData_0.01.h5 need to be copied to dataInput subfolder);
+3. rename dataInput/checkpointData_XXX.h5 into dataInput/checkpointData.h5 (i.e. remove the time name of the checkpoint data. for example, change the name of dataInput/checkpointData_0.01.h5 into dataInput/checkpointData.h5);
+4. (optional) to avoide overwrite of the previous calculated data, re-name the runData/structureDomain/structureResults;
+5. In 'Allrun', comment out './runCtrl/runDataFolderCreation' as the subfolder 'runData' has already created in previous run; comment out './runCtrl/preProcess' as we don't need OpenFOAM pre-processes (mesh generation, setFields, decomposePar, etc) in restart.
+6. execute the updated Allrun script.
