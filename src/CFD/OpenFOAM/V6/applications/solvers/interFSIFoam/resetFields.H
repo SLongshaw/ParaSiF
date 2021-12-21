@@ -24,7 +24,7 @@
 
     *********************************************************************
 
-    @file createDynamicFvMeshOri.H
+    @file resetFields.H
 
     @author W. Liu
 
@@ -40,25 +40,11 @@
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-Info<< "Create meshOri for time = "
-    << runTime.timeName() << nl << endl;
-
-autoPtr<dynamicFvMesh> meshOriPtr
-(
-    dynamicFvMesh::New
-    (
-        IOobject
-        (
-            dynamicFvMesh::defaultRegion,
-            runTime.timeName(),
-            runTime,
-            IOobject::MUST_READ
-        )
-    )
-);
-
-dynamicFvMesh& meshOri = meshOriPtr();
+U = Udummy;
+p = pdummy;
+cumulativeContErrLocal = 0.0;
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 
 // *************************  FILE END  ************************************ //

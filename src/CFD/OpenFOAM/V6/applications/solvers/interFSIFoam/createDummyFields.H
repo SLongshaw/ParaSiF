@@ -24,7 +24,7 @@
 
     *********************************************************************
 
-    @file createDynamicFvMeshOri.H
+    @file createDummyFields.H
 
     @author W. Liu
 
@@ -40,24 +40,33 @@
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-Info<< "Create meshOri for time = "
-    << runTime.timeName() << nl << endl;
-
-autoPtr<dynamicFvMesh> meshOriPtr
+Info<< "Reading dummy field pdummy\n" << endl;
+volScalarField pdummy
 (
-    dynamicFvMesh::New
+    IOobject
     (
-        IOobject
-        (
-            dynamicFvMesh::defaultRegion,
-            runTime.timeName(),
-            runTime,
-            IOobject::MUST_READ
-        )
-    )
+        "p_rgh",
+        runTime.timeName(),
+        mesh,
+        IOobject::MUST_READ,
+        IOobject::NO_WRITE
+    ),
+    mesh
 );
 
-dynamicFvMesh& meshOri = meshOriPtr();
+Info<< "Reading dummy field Udummy\n" << endl;
+volVectorField Udummy
+(
+    IOobject
+    (
+        "U",
+        runTime.timeName(),
+        mesh,
+        IOobject::MUST_READ,
+        IOobject::NO_WRITE
+    ),
+    mesh
+);
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

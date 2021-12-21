@@ -24,7 +24,7 @@
 
     *********************************************************************
 
-    @file createDynamicFvMeshOri.H
+    @file continuityErrsFSI.H
 
     @author W. Liu
 
@@ -40,24 +40,22 @@
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-Info<< "Create meshOri for time = "
-    << runTime.timeName() << nl << endl;
+{
+    volScalarField contErr(fvc::div(phi));
 
-autoPtr<dynamicFvMesh> meshOriPtr
-(
-    dynamicFvMesh::New
-    (
-        IOobject
-        (
-            dynamicFvMesh::defaultRegion,
-            runTime.timeName(),
-            runTime,
-            IOobject::MUST_READ
-        )
-    )
-);
+    scalar sumLocalContErr = runTime.deltaTValue()*
+        mag(contErr)().weightedAverage(mesh.V()).value();
 
-dynamicFvMesh& meshOri = meshOriPtr();
+    scalar globalContErr = runTime.deltaTValue()*
+        contErr.weightedAverage(mesh.V()).value();
+    cumulativeContErrLocal += globalContErr;
+
+    Info<< "time step continuity errors : sum local = " << sumLocalContErr
+        << ", global = " << globalContErr
+        << ", cumulativeLocal = " << cumulativeContErrLocal
+        << ", cumulativeGlobal = " << (cumulativeContErr + cumulativeContErrLocal)
+        << endl;
+}
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
