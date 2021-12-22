@@ -1058,8 +1058,10 @@ class StructureFSISolver:
                         mesh = BoxMesh(MPI_COMM_WORLD, Point(0, 0, 0), 
                            Point(1, 1, 1), 
                            10, 10, 10)
-                        hdfInTemp = HDF5File(mesh.mpi_comm(), InputFolderPath + "/mesh_boundary_and_values.h5", "r")
+                        hdfInTemp = HDF5File(mesh.mpi_comm(), InputFolderPath + "/checkpointData.h5", "r")
                         hdfInTemp.read(mesh, "/mesh", False)
+                        mesh_original = Mesh(mesh)                    # Store original mesh
+                        hdfInTemp.read(mesh_original, "/meshOri", False)
                         hdfInTemp.close()
                         del hdfInTemp 
                         if self.MPI_Get_Rank(MPI_COMM_WORLD) == 0: print ("{FENICS} Done with loading HDF5 mesh")
@@ -1070,8 +1072,7 @@ class StructureFSISolver:
                            Point((self.OBeamX+self.XBeam), (self.OBeamY+self.YBeam), (self.OBeamZ+self.ZBeam)), 
                            self.XMesh, self.YMesh, self.ZMesh)
                     if self.MPI_Get_Rank(MPI_COMM_WORLD) == 0: print ("{FENICS} Done with generating mesh")
-
-                mesh_original = Mesh(mesh)                    # Store original mesh
+                    mesh_original = Mesh(mesh)                    # Store original mesh
         else:
             if self.iMeshLoad:
                 # Load mesh from file
@@ -1922,13 +1923,13 @@ class StructureFSISolver:
                                 ftxt_time.close
                             else:
                                 ftxt_time = open(OutputFolderPath + "/timeFETCH" + str(irank)+ ".txt", "a")
-                                ftxt_time.write(str(Current_Time_Step)+","+
-                                                str(i_sub_it)+","+
-                                                str(timeNPZeroCreate)+","+
-                                                str(timePointsLoop)+","+
-                                                str(timeMUIFetchMany)+","+
-                                                str(timeVectFuncEvlu)+","+
-                                                str(timeFRArg))
+                                # ftxt_time.write(str(Current_Time_Step)+","+
+                                                # str(i_sub_it)+","+
+                                                # str(timeNPZeroCreate)+","+
+                                                # str(timePointsLoop)+","+
+                                                # str(timeMUIFetchMany)+","+
+                                                # str(timeVectFuncEvlu)+","+
+                                                # str(timeFRArg))
                                 ftxt_time.write("\n")
                                 ftxt_time.close
 
