@@ -69,7 +69,7 @@ cd ..
 rm 1.2.tar.gz
 mv MUI-1.2/ ../../../MUI
 
-cd ../../../MUI/MUI-1.2/wrappers/C
+cd ../../../MUI/wrappers/C
 make
 
 cd ../Python
