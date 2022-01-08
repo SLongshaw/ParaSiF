@@ -1,3 +1,0 @@
-SOURCE = \
-parabolicInletVelocity/parabolicInletVelocityFvPatchVectorField.C \
-parabolicInletVelocityTwoD/parabolicInletVelocityTwoDFvPatchVectorField.C 

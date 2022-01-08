@@ -66,40 +66,6 @@ SourceFiles
 
 \*---------------------------------------------------------------------------*/
 
-// No license
-// ----------
-
-// BAE-FSI
-// parabolicInletVelocityFvPatchVectorField.H
-//
-// This is a part of the Partitioned Multi-physical Simulation Framework (parMupSiF)
-//
-// FEniCSV2019.1.0+ <-> MUI(mui4py) <-> MUI(C++) <-> OpenFOAMV6+ two way Coupling Module.
-//
-// Incompressible Navier-Stokes equations for fluid domain in OpenFOAM
-// Structure dynamics equations for structure domain in FEniCS
-//
-// parabolicInletVelocityFvPatchVectorField.H is a C++ header file to create a 3D parabolic inlet velocity with a varied velocity magnitude
-//  for the CFD solver of the OpenFOAM pert of the parMupSiF code
-//
-// located in the src/CFD/OpenFOAM/V6/parmupsifLibs/parmupsifBC/parabolicInletVelocity sub-folder of the parMupSiF folder
-//
-// Last changed: 25-September-2019
-//
-// Author(s): W.L
-// Contact: wendi.liu@stfc.ac.uk
-//
-// Copyright 2019 UK Research and Innovation
-// IBM Confidential
-// OCO Source Materials
-// 5747-SM3
-// (c) Copyright IBM Corp. 2017, 2019
-// The source code for this program is not published or otherwise 
-// divested of its trade secrets, irrespective of what has 
-// been deposited with the U.S. Copyright Office. 
-//
-// All rights reserved
-
 #ifndef parabolicInletVelocityFvPatchVectorField_H
 #define parabolicInletVelocityFvPatchVectorField_H
 
