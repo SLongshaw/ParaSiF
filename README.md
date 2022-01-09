@@ -136,6 +136,18 @@ wmake pimpleFSIFoam
 wmake interFSIFoam
 ```
 
+**Step Five: Install ParaSiF OpenFOAM BC libs**
+
+```bash
+cd CFD/OpenFOAM/V6/applications/BC/
+
+# Source OpenFOAM run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Compile ParaSiF BC libs
+wmake
+```
+
 please note: if there are errors on eigen or mui.h during 'wmake pimpleFSIFoam' or 'wmake interFSIFoam', please open 'ParaSiF/src/CFD/OpenFOAM/V6/applications/solvers/pimpleFSIFoam/Make/options', change Line 18 - Line 19 according to your MUI and eigen3 folder path. Do the same for 'ParaSiF/src/CFD/OpenFOAM/V6/applications/solvers/interFSIFoam/Make/options'. Repeat the wmake after these modifications.
 
 ## Source and export before run ParaSiF cases
