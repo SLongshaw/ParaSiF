@@ -53,7 +53,7 @@ Should you have any question please do not hesitate to contact the developers
 
 **Step One: Install FEniCS v2019.0.1**
 
-It is recommended to build  FEniCS with Petse. To install PETCS and petsc4py, follow the instructions in https://www.mcs.anl.gov/petsc/petsc4py-current/docs/usrman/install.html
+It is recommended to build  FEniCS with petse. To install petsc and petsc4py, follow the instructions in https://www.mcs.anl.gov/petsc/petsc4py-current/docs/usrman/install.html
 
 It is important to add the following lines to .bashrc and source it. 
 ```bash
