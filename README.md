@@ -57,6 +57,8 @@ Please follow the instruction from FEniCS Prjoect Manual to install the FEniCS v
 
 If building FEniCS from source, please refer to the **Stable version** section to install the latest stable release of FEniCS (version 2019.1.0) from [this link](https://fenics.readthedocs.io/en/latest/installation.html#from-source)
 
+The instructions for compiling FEniCS 2019.1.0 on a number of different operating environments are provided in the doc/ subfolder.
+
 **Step Two: Obtain MUI and install FSI coupling lab and wrappers**
 
 ```bash
