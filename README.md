@@ -55,7 +55,7 @@ Should you have any question please do not hesitate to contact the developers
 
 It is recommended to build  FEniCS with Petse. To install PETCS and petsc4py, follow the instructions in https://www.mcs.anl.gov/petsc/petsc4py-current/docs/usrman/install.html
 
-It is important to add the following line to .bashrc and source it. 
+It is important to add the following lines to .bashrc and source it. 
 ```bash
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path/to/petsc/installation/directory/petsc/lib
 export PETSC_DIR=/path/to/petsc/installation/directory/petsc
