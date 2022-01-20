@@ -60,14 +60,32 @@ Download, configure and build pybind
 
 Download, configure and prepare BOOST
 --------------------------------------
-Follow the instruction given in the ***getting Start Guide*** in https://www.boost.org/. In sammary, download boost file and uncobress in the required location. To keep all the installed libraries in one place, the recomnided location is $
+Follow the instruction given in the ***getting Start Guide*** in https://www.boost.org/. In sammary:
 
 ```bash
  cd $BUILD_DIR
  wget -c 'http://sourceforge.net/projects/boost/files/boost/1.72.0/boost_1_72_0.tar.bz2/download'
-  tar -xvf boost_1_72_0.tar.bz2
-mv boost_1_72_0 boost
-cd boost
-./bootstrap.sh --prefix=$(PWD)/boost 
-./b2 install
+ tar -xvf boost_1_72_0.tar.bz2
+ mv boost_1_72_0 boost
+ cd boost
+ ./bootstrap.sh --prefix=$(PWD)/boost 
+ ./b2 install
+```
+Download, configure and install EIGEN
+--------------------------------------
+
+```bash
+  cd $BUILD_DIR
+  wget https://gitlab.com/libeigen/eigen/-/archive/3.3.9/eigen-3.3.9.tar.gz
+  tar zxvf eigen-3.3.9.tar.gz
+  mkdir eigen-3.3.9/build
+  cd eigen-3.3.9/build
+  cmake ../ -DCMAKE_INSTALL_PREFIX=build -DPYTHON_EXECUTABLE:FILEPATH=$BUILD_DIR/fenics2019_FSI/bin/python3
+  make -j 8 install
+```
+Install MPI for python 
+--------------------------------------
+```bash
+sudo apt-get install python3-pip
+python3 -m pip install numpy mpi4py
 ```
