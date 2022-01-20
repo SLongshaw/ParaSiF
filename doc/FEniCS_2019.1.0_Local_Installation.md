@@ -64,7 +64,7 @@ Follow the instruction given in the ***getting Start Guide*** in https://www.boo
 
 ```bash
  cd $BUILD_DIR
- wget -c 'http://sourceforge.net/projects/boost/files/boost/1.72.0/boost_1_72_0.tar.bz2/download'
+ wget -c 'http://sourceforge.net/projects/boost/files/boost/1.72.0/boost_1_72_0.tar.bz2'
  tar -xvf boost_1_72_0.tar.bz2
  mv boost_1_72_0 boost
  cd boost
