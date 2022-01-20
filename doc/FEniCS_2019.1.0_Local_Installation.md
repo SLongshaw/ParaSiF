@@ -40,7 +40,7 @@ Load modules and set python paths/build paths
   export PATH=$PATH:$BUILD_DIR/shared/bin
   export PYTHONPATH=$PYTHONPATH:$BUILD_DIR/lib/python3.8/site-packages
   export LD_LIBRARY_PATH=$BUILD_DIR/lib:$LD_LIBRARY_PATH
-  export CC=cc
+  export CC=mpicc
   export CXX=CC
 ```
 
