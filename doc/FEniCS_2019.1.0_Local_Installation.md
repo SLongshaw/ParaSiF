@@ -41,7 +41,10 @@ Load modules and set python paths/build paths
   export PYTHONPATH=$PYTHONPATH:$BUILD_DIR/lib/python3.8/site-packages
   export LD_LIBRARY_PATH=$BUILD_DIR/lib:$LD_LIBRARY_PATH
   export CC=mpicc
-  export CXX=CC
+  export CXX=mpiCC
+  export F77=mpif77
+  export FC=mpifort 
+  export ftn=mpifort
 ```
 
 Download, configure and build pybind
@@ -118,3 +121,76 @@ Download, configure and install FEniCS python components
   cd ffc-2019.1.0.post0/
   sudo python3 setup.py install
 ```
+
+
+Download, configure and install prerequisites for PETSc
+---------------------------------------------------------
+
+The "sundials" library is not required by the coupling, and is therefore not installed. As it is accounted for by default, Line 21 (L21) of tpsl.sh, to be found as `${BUILD_DIR}/boost/sh/tpsl.sh` has to be changed from
+
+printf "%s\n" glm hypre matio metis scotch parmetis mumps sundials superlu superlu-dist \
+to
+printf "%s\n" glm hypre matio metis scotch parmetis mumps superlu superlu-dist \
+
+```bash
+  cd $BUILD_DIR
+  cd  boost
+  ./sh/tpsl.sh --prefix=$(pwd)/boost
+  export PATH=$PATH:${BUILD_DIR}/boost/metis-5.1.0/include
+  export PATH=$PATH:${BUILD_DIR}/boost/parmetis-4.0.3/include
+  export PATH=$PATH:${BUILD_DIR}/boost/superlu/SRC
+  export PATH=$PATH:${BUILD_DIR}/boost/superlu_dist-6.4.0/SRC
+  export PATH=$PATH:${BUILD_DIR}/boost/scotch_6.1.0/include
+  export PATH=$PATH:${BUILD_DIR}/boost/MUMPS_5.3.5/include
+  export PATH=$PATH:${BUILD_DIR}/boost/hdf5-1.10.7_install/include
+  export PATH=$PATH:${BUILD_DIR}/boost/boost/include
+  export LD_LIBRARY_PATH=${BUILD_DIR}/boost/hdf5-1.10.7_install/lib:$LD_LIBRARY_PATH
+  export LD_RUN_PATH=${BUILD_DIR}/boost/hdf5-1.10.7_install/lib:$LD_RUN_PATH
+  export HDF5_INCLUDE_DIR=${BUILD_DIR}/boost/hdf5-1.10.7_install/include
+```
+
+Download, configure and install PETSc
+---------------------------------------
+
+```bash
+  cd $BUILD_DIR
+  cd  boost
+  wget https://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-3.11.4.tar.gz
+  tar zxvf petsc-3.11.4.tar.gz
+  cd petsc-3.11.4
+
+  export ROOT_SHARED_DIR=${BUILD_DIR}/boost
+  ######### Note that this is one command split in several lines
+  ./configure \
+  --prefix=$ROOT_SHARED_DIR/petsc-3.11.4/install \
+  --with-mpi=1 \
+  --CC=cc \
+  --CFLAGS=-O3 \
+  --CXX=CC \
+  --CXXFLAGS=-O3 \
+  --with-cxx-dialect=C++11 \
+  --FC=ftn \
+  --FFLAGS=-O3 \
+  --enable-debug=0 \
+  --enable-shared=1 \
+  --with-precision=double \
+  --with-hdf5=0 \
+  --with-hdf5-dir=$ROOT_SHARED_DIR/hdf5-1.10.7_install \
+  --download-superlu=yes \
+  --download-superlu_dist=yes \
+  --download-metis=yes \
+  --download-parmetis=yes \
+  --download-ptscotch=yes \
+  --with-scalapack=1 \
+  --with-mumps=1 \
+  --with-mumps-include="${BUILD_DIR}/boost/MUMPS_5.3.5/include" \
+  --with-mumps-lib="-L${BUILD_DIR}/boost/MUMPS_5.3.5/lib -lcmumps -ldmumps -lesmumps -lsmumps -lzmumps -lmumps_common -lptesmumps -lesmumps -lpord" \
+  –with-petsc4py=1 
+  ######### 
+
+  make PETSC_DIR=`pwd` all
+  make PETSC_DIR=`pwd` install
+  export PETSC_DIR=${BUILD_DIR}/boost/petsc-3.11.4
+  export PETSC_ARCH=arch-linux-c-opt
+```
+
