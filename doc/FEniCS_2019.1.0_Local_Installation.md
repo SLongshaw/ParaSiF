@@ -57,3 +57,17 @@ Download, configure and build pybind
   cmake -DPYBIND11_TEST=off .. -DCMAKE_INSTALL_PREFIX=$(pwd)
   make install
 ```
+
+Download, configure and prepare BOOST
+--------------------------------------
+Follow the instruction given in the ***getting Start Guide*** in https://www.boost.org/. In sammary, download boost file and uncobress in the required location. To keep all the installed libraries in one place, the recomnided location is $
+
+```bash
+ cd $BUILD_DIR
+ wget -c 'http://sourceforge.net/projects/boost/files/boost/1.72.0/boost_1_72_0.tar.bz2/download'
+  tar -xvf boost_1_72_0.tar.bz2
+mv boost_1_72_0 boost
+cd boost
+./bootstrap.sh --prefix=$(PWD)/boost 
+./b2 install
+```
