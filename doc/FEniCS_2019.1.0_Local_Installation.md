@@ -108,3 +108,13 @@ Download, configure and install hdf5
   export LD_LIBRARY_PATH=${BUILD_DIR}/boost/hdf5-1.10.7_install/lib:$LD_LIBRARY_PATH
   export LD_RUN_PATH=${BUILD_DIR}/boost/hdf5-1.10.7_install/lib:$LD_RUN_PATH
  ```
+Download, configure and install FEniCS python components
+---------------------------------------------------------
+
+```bash
+  cd $BUILD_DIR
+  wget https://bitbucket.org/fenics-project/ffc/downloads/ffc-2019.1.0.post0.tar.gz
+  tar zxvf ffc-2019.1.0.post0.tar.gz
+  cd ffc-2019.1.0.post0/
+  sudo python3 setup.py install
+```
