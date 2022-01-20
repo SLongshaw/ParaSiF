@@ -68,7 +68,7 @@ Follow the instruction given in the ***getting Start Guide*** in https://www.boo
  tar -xvf boost_1_72_0.tar.bz2
  mv boost_1_72_0 boost
  cd boost
- ./bootstrap.sh --prefix=$(PWD)/boost 
+ ./bootstrap.sh --prefix=$(pwd)/boost --exec-prefix=$(pwd)/boost/bin --libdir=$(pwd)/boost/lib --includedir=$(pwd)/boost/include
  ./b2 install
 ```
 Download, configure and install EIGEN
