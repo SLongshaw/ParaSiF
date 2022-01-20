@@ -26,9 +26,6 @@ Load modules and set python paths/build paths
 ---------------------------------------------
 
 ```bash
-  module load PrgEnv-gnu
-  module load cray-python
-  module load cmake
 
   cd $BUILD_DIR
 
@@ -45,4 +42,18 @@ Load modules and set python paths/build paths
   export LD_LIBRARY_PATH=$BUILD_DIR/lib:$LD_LIBRARY_PATH
   export CC=cc
   export CXX=CC
+```
+
+Download, configure and build pybind
+-------------------------------------
+
+```bash
+  cd $BUILD_DIR
+  export PYBIND11_VERSION=2.6.1
+  wget https://github.com/pybind/pybind11/archive/v${PYBIND11_VERSION}.tar.gz
+  tar zxvf v${PYBIND11_VERSION}.tar.gz
+  mkdir pybind11-${PYBIND11_VERSION}/build
+  cd pybind11-${PYBIND11_VERSION}/build
+  cmake -DPYBIND11_TEST=off .. -DCMAKE_INSTALL_PREFIX=$(pwd)
+  make install
 ```
