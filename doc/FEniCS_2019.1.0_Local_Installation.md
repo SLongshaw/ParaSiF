@@ -164,12 +164,12 @@ Download, configure and install PETSc
   ./configure \
   --prefix=$ROOT_SHARED_DIR/petsc-3.11.4/install \
   --with-mpi=1 \
-  --CC=cc \
+  --CC=mpicc \
   --CFLAGS=-O3 \
-  --CXX=CC \
+  --CXX=mpiCC \
   --CXXFLAGS=-O3 \
   --with-cxx-dialect=C++11 \
-  --FC=ftn \
+  --FC=mpifort \
   --FFLAGS=-O3 \
   --enable-debug=0 \
   --enable-shared=1 \
