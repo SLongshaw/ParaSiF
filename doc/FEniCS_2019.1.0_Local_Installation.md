@@ -185,11 +185,11 @@ Download, configure and install PETSc
   --with-mumps=1 \
   --with-mumps-include="${BUILD_DIR}/boost/MUMPS_5.3.5/include" \
   --with-mumps-lib="-L${BUILD_DIR}/boost/MUMPS_5.3.5/lib -lcmumps -ldmumps -lesmumps -lsmumps -lzmumps -lmumps_common -lptesmumps -lesmumps -lpord" \
-  –with-petsc4py=1 
+  --with-petsc4py=1 
   ######### 
   
   
-  ./configure   --prefix=$ROOT_SHARED_DIR/petsc-3.11.4/install   --with-mpi=1   --CC=mpicc   --CFLAGS=-O3   --CXX=mpiCC   --CXXFLAGS=-O3   --with-cxx-dialect=C++11   --FC=mpifort   --FFLAGS=-O3   --enable-debug=0   --enable-shared=1   --with-precision=double   --with-hdf5=0   --with-hdf5-dir=$ROOT_SHARED_DIR/hdf5-1.10.7_install   --download-superlu=yes   --download-superlu_dist=yes   --download-metis=yes   --download-parmetis=yes   --download-ptscotch=yes   --download-scalapack   --download-mumps   –with-petsc4py=1
+  ./configure   --prefix=$ROOT_SHARED_DIR/petsc-3.11.4/install   --with-mpi=1   --CC=mpicc   --CFLAGS=-O3   --CXX=mpiCC   --CXXFLAGS=-O3   --with-cxx-dialect=C++11   --FC=mpifort   --FFLAGS=-O3   --enable-debug=0   --enable-shared=1   --with-precision=double   --with-hdf5=0   --with-hdf5-dir=$ROOT_SHARED_DIR/hdf5-1.10.7_install   --download-superlu=yes   --download-superlu_dist=yes   --download-metis=yes   --download-parmetis=yes   --download-ptscotch=yes   --download-scalapack   --download-mumps   --with-petsc4py=1
 
   make PETSC_DIR=`pwd` all
   make PETSC_DIR=`pwd` install
