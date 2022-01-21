@@ -208,3 +208,53 @@ Download DOLFIN, and make sure that all the dependencies are correct:
   export PETSC_DIR=${BUILD_DIR}/boost/petsc-$PETSC_VERSION
   export PETSC_ARCH=arch-linux-c-opt
 ```
+
+The file `$BUILD_DIR/dolfin/CMakeLists.txt` needs some editing to 
+add the following text to the top of the file (at Line 5 (L5)):
+
+```bash
+  SET( EIGEN3_INCLUDE_DIR "$ENV{EIGEN3_INCLUDE_DIR}" )
+  IF( NOT EIGEN3_INCLUDE_DIR )
+      MESSAGE( FATAL_ERROR "Please point the environment variable EIGEN3_INCLUDE_DIR to the include directory of your Eigen3 installation.")
+  ENDIF()
+  INCLUDE_DIRECTORIES ( "${EIGEN3_INCLUDE_DIR}" )
+```
+
+The file `$BUILD_DIR/dolfin/cmake/modules/FindPETSc.cmake` needs some editing and the following line should be changed 
+
+```bash
+  pkg_search_module(PETSC craypetsc_real PETSc)
+  into
+  pkg_search_module(PETSC petsc PETSc)
+```
+
+Finally, CMake is ran as follows, before the code is installed using make:
+
+```bash
+  cmake -DCMAKE_INSTALL_PREFIX=$(pwd)   \
+  -DPYTHON_EXECUTABLE:FILEPATH=$BUILD_DIR/fenics2019_FSI/bin/python3   \
+  -DDOLFIN_ENABLE_PYTHON=true \
+  -DDOLFIN_USE_PYTHON3=true \
+  -DDOLFIN_ENABLE_PETSC=true \
+  -DPETSC_DIR="${BUILD_DIR}/boost/petsc-PETSC_VERSION" \
+  -DPETSC_LIBRARY="${BUILD_DIR}/boost/petsc-PETSC_VERSION/arch-linux-c-opt/lib/libpetsc.so" \
+  -DDOLFIN_SKIP_BUILD_TESTS=true \
+  -DCMAKE_REQUIRED_LIBRARIES="-lmpifort" \
+  -DCMAKE_CXX_FLAGS_RELEASE="-Wno-literal-suffix -O3 -DNDEBUG" \
+  -DHDF5_ROOT="${BUILD_DIR}/boost/hdf5-1.10.7_install" \
+  -DHDF5_INCLUDE_DIRS="${BUILD_DIR}/boost/hdf5-1.10.7_install/include" \
+  -DPTESMUMPS_LIBRARY="${BUILD_DIR}/boost/petsc-PETSC_VERSION/install/lib/libptesmumps.a" \
+  ..
+
+  make -j 8 install
+  source ${BUILD_DIR}/dolfin/build/share/dolfin/dolfin.conf
+```
+
+Build python build
+
+```bash
+  cd ../python
+  export pybind11_DIR=$BUILD_DIR/pybind11-2.6.1/build//share/cmake/pybind11/
+  export DOLFIN_DIR=$BUILD_DIR/dolfin/build/share/dolfin/cmake
+  python3 setup.py install
+```
