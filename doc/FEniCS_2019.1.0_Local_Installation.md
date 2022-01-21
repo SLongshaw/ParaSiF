@@ -190,7 +190,7 @@ An easy way to install petsc4py after building the dependencies and setting the 
 Download, configure and install DOLFIN
 ---------------------------------------
 
-Download DOLFIN, and make sure that all the dependencies are correct:
+Download DOLFIN, and make sure that all the dependencies and their location are correct:
 
 ```bash
   cd $BUILD_DIR
@@ -228,11 +228,12 @@ The file `$BUILD_DIR/dolfin/cmake/modules/FindPETSc.cmake` needs some editing an
   pkg_search_module(PETSC petsc PETSc)
 ```
 
-Finally, CMake is ran as follows, before the code is installed using make:
+Define the python location in PYTHON_LOCATION. Finally, CMake is ran as follows, before the code is installed using make:
 
 ```bash
+  export PYTHON_LOCATION=/usr/bin/python3 
   cmake -DCMAKE_INSTALL_PREFIX=$(pwd)   \
-  -DPYTHON_EXECUTABLE:FILEPATH=$BUILD_DIR/fenics2019_FSI/bin/python3   \
+  -DPYTHON_EXECUTABLE:FILEPATH=$PYTHON_LOCATION   \
   -DDOLFIN_ENABLE_PYTHON=true \
   -DDOLFIN_USE_PYTHON3=true \
   -DDOLFIN_ENABLE_PETSC=true \
