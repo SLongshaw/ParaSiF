@@ -153,16 +153,17 @@ Download, configure and install PETSc
 ---------------------------------------
 
 ```bash
+  export version="3.16.3"
   cd $BUILD_DIR
   cd  boost
-  wget https://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-3.16.3.tar.gz
-  tar zxvf petsc-3.16.3.tar.gz
-  cd petsc-3.16.3
+  wget https://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-$version.tar.gz
+  tar zxvf petsc-$version.tar.gz
+  cd petsc-$version
 
   export ROOT_SHARED_DIR=${BUILD_DIR}/boost
   ######### Note that this is one command split in several lines
   ./configure \
-  --prefix=$ROOT_SHARED_DIR/petsc-3.16.3/install \
+  --prefix=$ROOT_SHARED_DIR/petsc-$version/install \
   --with-mpi=1 \
   --CC=mpicc \
   --CFLAGS=-O3 \
@@ -189,18 +190,18 @@ Download, configure and install PETSc
   ######### 
   
   
-  ./configure  --download-cmake --prefix=$ROOT_SHARED_DIR/petsc-3.16.3/install   --with-mpi=1   --CC=mpicc   --CFLAGS=-O3   --CXX=mpiCC   --CXXFLAGS=-O3   --with-cxx-dialect=C++11   --FC=mpifort   --FFLAGS=-O3   --enable-debug=0   --enable-shared=1   --with-precision=double   --with-hdf5=0   --with-hdf5-dir=$ROOT_SHARED_DIR/hdf5-1.10.7_install   --download-superlu=yes   --download-superlu_dist=yes   --download-metis=yes   --download-parmetis=yes   --download-ptscotch=yes   --download-scalapack   --download-mumps   --with-petsc4py=1
+  ./configure  --download-cmake --prefix=$ROOT_SHARED_DIR/petsc-$version/install   --with-mpi=1   --CC=mpicc   --CFLAGS=-O3   --CXX=mpiCC   --CXXFLAGS=-O3   --with-cxx-dialect=C++11   --FC=mpifort   --FFLAGS=-O3   --enable-debug=0   --enable-shared=1   --with-precision=double   --with-hdf5=0   --with-hdf5-dir=$ROOT_SHARED_DIR/hdf5-1.10.7_install   --download-superlu=yes   --download-superlu_dist=yes   --download-metis=yes   --download-parmetis=yes   --download-ptscotch=yes   --download-scalapack   --download-mumps   --with-petsc4py=1
   
   
-  ./configure  --download-cmake --prefix=$ROOT_SHARED_DIR/petsc-3.16.3/install   --with-mpi=1  --enable-shared=1   --with-precision=double  --download-superlu=yes   --download-superlu_dist=yes   --download-metis=yes   --download-parmetis=yes   --download-ptscotch=yes   --download-scalapack   --download-mumps   --with-petsc4py=1 ; make PETSC_DIR=`pwd` all ; make PETSC_DIR=`pwd` install
+  ./configure  --download-cmake --prefix=$ROOT_SHARED_DIR/petsc-$version/install   --with-mpi=1  --enable-shared=1   --with-precision=double  --download-superlu=yes   --download-superlu_dist=yes   --download-metis=yes   --download-parmetis=yes   --download-ptscotch=yes   --download-scalapack   --download-mumps   --with-petsc4py=1 ; make PETSC_DIR=`pwd` all ; make PETSC_DIR=`pwd` install
 
-  ./configure --download-cmake  --prefix=$ROOT_SHARED_DIR/petsc-3.11.4/install   --with-mpi=1  --enable-shared=1   --with-precision=double   --with-petsc4py=1
+  ./configure --download-cmake  --prefix=$ROOT_SHARED_DIR/petsc-$version/install   --with-mpi=1  --enable-shared=1   --with-precision=double   --with-petsc4py=1
 193
 
 
   make PETSC_DIR=`pwd` all
   make PETSC_DIR=`pwd` install
-  export PETSC_DIR=${BUILD_DIR}/boost/petsc-3.16.3
+  export PETSC_DIR=${BUILD_DIR}/boost/petsc-$version
   export PETSC_ARCH=arch-linux-c-opt
 ```
 
