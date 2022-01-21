@@ -189,12 +189,12 @@ Download, configure and install PETSc
   ######### 
   
   
-  ./configure   --prefix=$ROOT_SHARED_DIR/petsc-3.16.3/install   --with-mpi=1   --CC=mpicc   --CFLAGS=-O3   --CXX=mpiCC   --CXXFLAGS=-O3   --with-cxx-dialect=C++11   --FC=mpifort   --FFLAGS=-O3   --enable-debug=0   --enable-shared=1   --with-precision=double   --with-hdf5=0   --with-hdf5-dir=$ROOT_SHARED_DIR/hdf5-1.10.7_install   --download-superlu=yes   --download-superlu_dist=yes   --download-metis=yes   --download-parmetis=yes   --download-ptscotch=yes   --download-scalapack   --download-mumps   --with-petsc4py=1
+  ./configure  --download-cmake --prefix=$ROOT_SHARED_DIR/petsc-3.16.3/install   --with-mpi=1   --CC=mpicc   --CFLAGS=-O3   --CXX=mpiCC   --CXXFLAGS=-O3   --with-cxx-dialect=C++11   --FC=mpifort   --FFLAGS=-O3   --enable-debug=0   --enable-shared=1   --with-precision=double   --with-hdf5=0   --with-hdf5-dir=$ROOT_SHARED_DIR/hdf5-1.10.7_install   --download-superlu=yes   --download-superlu_dist=yes   --download-metis=yes   --download-parmetis=yes   --download-ptscotch=yes   --download-scalapack   --download-mumps   --with-petsc4py=1
   
   
-  ./configure   --prefix=$ROOT_SHARED_DIR/petsc-3.16.3/install   --with-mpi=1  --enable-shared=1   --with-precision=double  --download-superlu=yes   --download-superlu_dist=yes   --download-metis=yes   --download-parmetis=yes   --download-ptscotch=yes   --download-scalapack   --download-mumps   --with-petsc4py=1 ; make PETSC_DIR=`pwd` all ; make PETSC_DIR=`pwd` install
+  ./configure  --download-cmake --prefix=$ROOT_SHARED_DIR/petsc-3.16.3/install   --with-mpi=1  --enable-shared=1   --with-precision=double  --download-superlu=yes   --download-superlu_dist=yes   --download-metis=yes   --download-parmetis=yes   --download-ptscotch=yes   --download-scalapack   --download-mumps   --with-petsc4py=1 ; make PETSC_DIR=`pwd` all ; make PETSC_DIR=`pwd` install
 
-  ./configure   --prefix=$ROOT_SHARED_DIR/petsc-3.11.4/install   --with-mpi=1  --enable-shared=1   --with-precision=double   --with-petsc4py=1
+  ./configure --download-cmake  --prefix=$ROOT_SHARED_DIR/petsc-3.11.4/install   --with-mpi=1  --enable-shared=1   --with-precision=double   --with-petsc4py=1
 193
 
 
