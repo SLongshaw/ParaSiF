@@ -153,16 +153,16 @@ Download, configure and install PETSc
 ---------------------------------------
 
 ```bash
-  export version="3.16.3"
+  export PETSC_VERSION="3.16.3"
   cd $BUILD_DIR
   cd  boost
-  wget https://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-$version.tar.gz
-  tar zxvf petsc-$version.tar.gz
-  cd petsc-$version
+  wget https://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-$PETSC_VERSION.tar.gz
+  tar zxvf petsc-$PETSC_VERSION.tar.gz
+  cd petsc-$PETSC_VERSION
 
   export ROOT_SHARED_DIR=${BUILD_DIR}/boost
    
-  ./configure  --download-cmake --prefix=$ROOT_SHARED_DIR/petsc-$version/install \
+  ./configure  --download-cmake --prefix=$ROOT_SHARED_DIR/petsc-$PETSC_VERSION/install \
   --with-mpi=1  --enable-shared=1   --with-precision=double  --download-superlu=yes \
   --download-superlu_dist=yes   --download-metis=yes   --download-parmetis=yes   \
   --download-ptscotch=yes   --download-scalapack   --download-mumps   --with-petsc4py=1 
@@ -181,10 +181,30 @@ An easy way to install petsc4py after building the dependencies and setting the 
 
 ```bash
 
-  export PETSC_DIR=${BUILD_DIR}/boost/petsc-$version
+  export PETSC_DIR=${BUILD_DIR}/boost/petsc-$PETSC_VERSION
   export PETSC_ARCH=arch-linux-c-opt
   pip3 install petsc4py
   
 ```
 
+Download, configure and install DOLFIN
+---------------------------------------
 
+Download DOLFIN, and make sure that all the dependencies are correct:
+
+```bash
+  cd $BUILD_DIR
+  export FENICS_VERSION=2019.1.0.post0
+  git clone --branch=$FENICS_VERSION https://bitbucket.org/fenics-project/dolfin
+  mkdir dolfin/build
+  cd dolfin/build
+  export BOOST_ROOT=$BUILD_DIR/boost
+  export EIGEN3_INCLUDE_DIR=$BUILD_DIR/eigen-3.3.9/build/build/include/eigen3
+  export SCOTCH_DIR=$BUILD_DIR/boost/boost
+  
+  export LD_LIBRARY_PATH=${BUILD_DIR}/boost/hdf5-1.10.7_install/lib:$LD_LIBRARY_PATH
+  export LD_RUN_PATH=${BUILD_DIR}/boost/hdf5-1.10.7_install/lib:$LD_RUN_PATH
+  export HDF5_INCLUDE_DIR=${BUILD_DIR}/boost/hdf5-1.10.7_install/include
+  export PETSC_DIR=${BUILD_DIR}/boost/petsc-$PETSC_VERSION
+  export PETSC_ARCH=arch-linux-c-opt
+```
