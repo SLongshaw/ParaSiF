@@ -177,9 +177,10 @@ Install PETSc4py
 ---------------------------------------
 Detailed instructions to install petsc4py are given in https://github.com/erdc/petsc4py/blob/master/docs/source/install.rst
 
-An easy way to install petsc4py after building the dependencies dependancies and setting the environment variables is to use pip. 
+An easy way to install petsc4py after building the dependencies and setting the environment variables is to use pip. 
 
 ```bash
+
   export PETSC_DIR=${BUILD_DIR}/boost/petsc-$version
   export PETSC_ARCH=arch-linux-c-opt
   pip3 install petsc4py
