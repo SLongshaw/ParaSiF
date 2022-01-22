@@ -183,6 +183,12 @@ An easy way to install petsc4py after building the dependencies and setting the 
   pip3 install petsc4py
   
 ```
+Check that petsc4py is installed correctly and the right path and environmental variable are set.
+```bash
+python3 -c "import petsc4py; print(petsc4py.get_include())"
+
+python3 -c "from petsc4py import PETSc"
+```
 
 Download, configure and install DOLFIN
 ---------------------------------------
