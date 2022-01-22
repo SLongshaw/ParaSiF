@@ -96,8 +96,7 @@ Download, configure and install hdf5
 -------------------------------------
 
 ```bash
-  cd $BUILD_DIR
-  cd boost
+  cd $BUILD_DIR/boost
   wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.10/hdf5-1.10.7/src/hdf5-1.10.7.tar.gz
   tar zxvf hdf5-1.10.7.tar.gz
   cd hdf5-1.10.7  
