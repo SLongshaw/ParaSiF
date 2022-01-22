@@ -165,7 +165,7 @@ Download, configure and install PETSc
   ./configure  --download-cmake --prefix=$ROOT_SHARED_DIR/petsc-$PETSC_VERSION/install \
   --with-mpi=1  --enable-shared=1   --with-precision=double  --download-superlu=yes \
   --download-superlu_dist=yes   --download-metis=yes   --download-parmetis=yes   \
-  --download-ptscotch=yes   --download-scalapack   --download-mumps   --with-petsc4py=1 
+  --download-ptscotch=yes   --download-scalapack   --download-mumps   --with-petsc4py=1 --with-shared-libraries
   
   make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt all
   make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt install
