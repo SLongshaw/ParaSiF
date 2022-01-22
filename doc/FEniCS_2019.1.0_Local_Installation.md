@@ -132,8 +132,7 @@ to
 printf "%s\n" glm hypre matio metis scotch parmetis mumps superlu superlu-dist \
 
 ```bash
-  cd $BUILD_DIR
-  cd  boost
+  cd $BUILD_DIR/boost
   ./sh/tpsl.sh --prefix=$(pwd)/boost
   export PATH=$PATH:${BUILD_DIR}/boost/metis-5.1.0/include
   export PATH=$PATH:${BUILD_DIR}/boost/parmetis-4.0.3/include
@@ -153,8 +152,7 @@ Download, configure and install PETSc
 
 ```bash
   export PETSC_VERSION="3.16.3"
-  cd $BUILD_DIR
-  cd  boost
+  cd $BUILD_DIR/boost
   wget https://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-$PETSC_VERSION.tar.gz
   tar zxvf petsc-$PETSC_VERSION.tar.gz
   cd petsc-$PETSC_VERSION
