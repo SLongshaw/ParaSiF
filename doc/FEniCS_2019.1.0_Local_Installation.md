@@ -181,15 +181,15 @@ export PETSC_ARCH=arch-linux-c-opt
 To use petsc4py, add PYTHONPATH, and add the line to ***.bashrc*** file
 
 ```bash
-export PYTHONPATH=$PYTHONPATH:$ROOT_SHARED_DIR/petsc-$PETSC_VERSION/arch-linux-c-opt/lib to 
+export PYTHONPATH=$PYTHONPATH:$ROOT_SHARED_DIR/petsc-$PETSC_VERSION/arch-linux-c-opt/lib  
 ```
 
 Install PETSc4py
 ---------------------------------------
 
-PETSc4py should have been allready installed if the option ***--with-petsc4py=1*** was used in the configuration of petsc. This option build petsc4py along with petsc. If petsc4py is built then skip the next step and go to the ***Test PETSC and PETSc4py*** to confirm that the libaray is working
+PETSc4py should have been allready installed if the option ***--with-petsc4py=1*** was used in the configuration of petsc. This option build petsc4py along with petsc. If petsc4py is built then skip this step and go to the ***Test PETSC and PETSc4py*** to confirm that the libaray is working.
 
-An easy way to install petsc4py after building the dependencies and setting the environment variables is to use pip. 
+An easy way to install petsc4py after building the dependencies and setting the environment variables is to use pip. This will install PETSc4py in /usr/local/lib/python3.x/dist-packages.
 
 ```bash
 
@@ -265,7 +265,7 @@ Define the python location in PYTHON_LOCATION. Finally, CMake is ran as follows,
  -DCMAKE_CXX_FLAGS_RELEASE="-Wno-literal-suffix -O3 -DNDEBUG" \
  -DHDF5_ROOT="${BUILD_DIR}/boost/hdf5-1.10.7_install" \
  -DHDF5_INCLUDE_DIRS="${BUILD_DIR}/boost/hdf5-1.10.7_install/include" \
- -DPTESMUMPS_LIBRARY="${BUILD_DIR}/boost/petsc-$PETSC_VERSION/install/lib/libptesmumps.a" \
+ -DPTESMUMPS_LIBRARY="${BUILD_DIR}/boost/petsc-$PETSC_VERSION/$PETSC_ARCH/lib/libptesmumps.a" \
   ..
 
  make -j 8 install
