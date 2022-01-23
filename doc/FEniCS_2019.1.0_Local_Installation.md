@@ -187,7 +187,7 @@ export PYTHONPATH=$PYTHONPATH:$ROOT_SHARED_DIR/petsc-$PETSC_VERSION/arch-linux-c
 Install PETSc4py
 ---------------------------------------
 
-PETSc4py should have been allready installed if the option ***--with-petsc4py=1*** was used in the configuration of petsc. This option build petsc4py along with petsc. If petsc4py is build then skip the next step and go to the ***Test PETSC and PETSc4py*** to confirm that the libaray is working
+PETSc4py should have been allready installed if the option ***--with-petsc4py=1*** was used in the configuration of petsc. This option build petsc4py along with petsc. If petsc4py is built then skip the next step and go to the ***Test PETSC and PETSc4py*** to confirm that the libaray is working
 
 An easy way to install petsc4py after building the dependencies and setting the environment variables is to use pip. 
 
