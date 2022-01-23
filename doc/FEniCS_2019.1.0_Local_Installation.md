@@ -249,7 +249,7 @@ The file `$BUILD_DIR/dolfin/cmake/modules/FindPETSc.cmake` needs some editing an
  pkg_search_module(PETSC petsc PETSc)
 ```
 
-Define the python location in PYTHON_LOCATION. Finally, CMake is ran as follows, before the code is installed using make:
+Define the python location in PYTHON_LOCATION, and check that the paths defined below exist. If not define the right ones. Finally, CMake is ran as follows, before the code is installed using make:
 
 ```bash
  export PYTHON_LOCATION=/usr/bin/python3 
@@ -276,7 +276,7 @@ Build python build
 
 ```bash
  cd ../python
- export pybind11_DIR=$BUILD_DIR/pybind11-2.6.1/build//share/cmake/pybind11/
+ export pybind11_DIR=$BUILD_DIR/pybind11-2.6.1/build/share/cmake/pybind11/
  export DOLFIN_DIR=$BUILD_DIR/dolfin/build/share/dolfin/cmake
  python3 setup.py install
 ```
