@@ -199,6 +199,7 @@ An easy way to install petsc4py after building the dependencies and setting the 
 ```
 Check that petsc4py is installed correctly and the right path and environmental variable are set.
 ```bash
+make PETSC_DIR=${BUILD_DIR}/boost/petsc-$PETSC_VERSION PETSC_ARCH=arch-linux-c-opt check
 python3 -c "import petsc4py; print(petsc4py.get_include())"
 
 python3 -c "from petsc4py import PETSc"
