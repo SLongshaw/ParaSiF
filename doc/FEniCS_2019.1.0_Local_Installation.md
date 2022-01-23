@@ -151,22 +151,37 @@ Download, configure and install PETSc
 ---------------------------------------
 
 ```bash
- export PETSC_VERSION="3.16.3"
- cd $BUILD_DIR/boost
- wget https://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-$PETSC_VERSION.tar.gz
- tar zxvf petsc-$PETSC_VERSION.tar.gz
- cd petsc-$PETSC_VERSION
+export PETSC_VERSION="3.16.3"
+cd $BUILD_DIR/boost
+wget https://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-$PETSC_VERSION.tar.gz
+tar zxvf petsc-$PETSC_VERSION.tar.gz
+cd petsc-$PETSC_VERSION
+ 
+export PETSC_DIR=${BUILD_DIR}/boost/petsc-$PETSC_VERSION
+export PETSC_ARCH=arch-linux-c-opt
 
- export ROOT_SHARED_DIR=${BUILD_DIR}/boost
-   
- ./configure  --download-cmake --prefix=$ROOT_SHARED_DIR/petsc-$PETSC_VERSION/install \
- --with-mpi=1  --enable-shared=1   --with-precision=double  --download-superlu=yes \
- --download-superlu_dist=yes   --download-metis=yes   --download-parmetis=yes   \
- --download-ptscotch=yes   --download-scalapack   --download-mumps   --with-petsc4py=1 --with-shared-libraries
+export ROOT_SHARED_DIR=${BUILD_DIR}/boost
+
+./configure --with-petsc4py=1 --force --download-superlu=yes --download-metis=yes   --download-parmetis=yes --download-ptscotch=yes   --download-scalapack   --download-mumps --download-cmake --download-superlu_dist=yes
+
+#./configure  --download-cmake --prefix=$ROOT_SHARED_DIR/petsc-$PETSC_VERSION/install \
+#--with-mpi=1  --enable-shared=1   --with-precision=double  --download-superlu=yes \
+#--download-superlu_dist=yes   --download-metis=yes   --download-parmetis=yes   \
+#--download-ptscotch=yes   --download-scalapack   --download-mumps   --with-petsc4py=1 --with-shared-libraries
   
- make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt all
- make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt install
+make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt all
+make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt install
 
+```
+Add the lines below to ***.bashrc*** file. 
+```bash
+export PETSC_DIR=${BUILD_DIR}/boost/petsc-$PETSC_VERSION
+export PETSC_ARCH=arch-linux-c-opt
+```
+To use petsc4py, add PYTHONPATH, and add the line to ***.bashrc*** file
+
+```bash
+export PYTHONPATH=$PYTHONPATH:$ROOT_SHARED_DIR/petsc-$PETSC_VERSION/arch-linux-c-opt/lib to 
 ```
 
 Install PETSc4py
