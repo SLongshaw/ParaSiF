@@ -68,6 +68,7 @@ If building FEniCS from source, please refer to the **Stable version** section t
 The instructions for compiling FEniCS 2019.1.0 on a number of different operating environments are provided in the doc/ subfolder.
 
 **Step Two: Obtain MUI and install FSI coupling lab and wrappers**
+Note: inside the files Makefile used below, the path for ***eigen*** library has to be defined.
 
 ```bash
 cd ParaSiF/src/MUI_Utility
