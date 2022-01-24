@@ -285,3 +285,8 @@ If the python build was made at the location ***DOLFIN4PY_LOCATION***, then ***P
 ```bash
 export PYTHONPATH=$PYTHONPATH:$DOLFIN4PY_LOCATION/lib/python3.8/site-packages/fenics_dolfin-2019.1.0-py3.8-linux-x86_64.egg
 ```
+Now test Dolfin is bulid with the following command, and hopefuly you get no error
+```bash
+python3 -c "from dolfin import *"
+```
+
