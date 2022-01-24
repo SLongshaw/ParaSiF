@@ -29,17 +29,17 @@ Load modules and set python paths/build paths
 
  cd $BUILD_DIR
 
- export PYTHONUSERBASE=${INSTALL_FOLDER}/.local
- export PATH=$PYTHONUSERBASE/bin:$PATH
+ #export PYTHONUSERBASE=${INSTALL_FOLDER}/.local
+ #export PATH=$PYTHONUSERBASE/bin:$PATH
 
- pip install --user virtualenv
- virtualenv --version
- virtualenv --system-site-packages fenics2019_FSI
+ #pip install --user virtualenv
+ #virtualenv --version
+ #virtualenv --system-site-packages fenics2019_FSI
 
- export PATH=$PATH:$BUILD_DIR/bin
- export PATH=$PATH:$BUILD_DIR/shared/bin
+ #export PATH=$PATH:$BUILD_DIR/bin
+ #export PATH=$PATH:$BUILD_DIR/shared/bin
  export PYTHONPATH=$PYTHONPATH:$BUILD_DIR/lib/python3.8/site-packages
- export LD_LIBRARY_PATH=$BUILD_DIR/lib:$LD_LIBRARY_PATH
+ #export LD_LIBRARY_PATH=$BUILD_DIR/lib:$LD_LIBRARY_PATH
  export CC=mpicc
  export CXX=mpiCC
  export F77=mpif77
