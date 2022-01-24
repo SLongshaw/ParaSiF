@@ -1,6 +1,6 @@
 Install dependancies 
 --------------------------------------------- 
-Run the following to install **GNU compiler** and **make**
+Run the following to install **GNU compiler** and **make** if you do not have them.
 ```bash
 sudo apt update
 sudo apt install build-essential
