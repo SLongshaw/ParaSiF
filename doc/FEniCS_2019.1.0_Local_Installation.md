@@ -276,7 +276,7 @@ Build python build. If you need to installing it on a specific location, $(DOLFI
 
 ```bash
  cd ../python
- export DOLFIN4PY_LOCATION=$(pwd) # If you install in the current location instead of the standard to avoid any issue with sudo privileges.
+ export DOLFIN4PY_LOCATION=$(pwd) # If you want install in the current location instead of the standard one.
  export pybind11_DIR=$BUILD_DIR/pybind11-2.6.1/build/share/cmake/pybind11/
  export DOLFIN_DIR=$BUILD_DIR/dolfin/build/share/dolfin/cmake
  python3 setup.py install --prefix=$DOLFIN4PY_LOCATION
