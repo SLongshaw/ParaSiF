@@ -272,11 +272,16 @@ Define the python location in PYTHON_LOCATION, and check that the paths defined 
  source ${BUILD_DIR}/dolfin/build/share/dolfin/dolfin.conf
 ```
 
-Build python build
+Build python build. If you need to installing it on a specific location, $(DOLFIN4PY_LOCATION), beacuse the sudo privileges, then used the option ***--prefix***.
 
 ```bash
  cd ../python
+ export DOLFIN4PY_LOCATION=$(pwd) # If you install in the current location instead of the standard to avoid any issue with sudo privileges.
  export pybind11_DIR=$BUILD_DIR/pybind11-2.6.1/build/share/cmake/pybind11/
  export DOLFIN_DIR=$BUILD_DIR/dolfin/build/share/dolfin/cmake
- python3 setup.py install
+ python3 setup.py install --prefix=$DOLFIN4PY_LOCATION
+```
+If the python build was made at the location ***DOLFIN4PY_LOCATION***, then ***PYTHONPATH*** must be added:
+```bash
+export PYTHONPATH=$PYTHONPATH:$DOLFIN4PY_LOCATION/lib/python3.8/site-packages/fenics_dolfin-2019.1.0-py3.8-linux-x86_64.egg
 ```
