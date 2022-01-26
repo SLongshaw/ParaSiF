@@ -211,7 +211,7 @@ python3 -c "from petsc4py import PETSc"
 Download, configure and install DOLFIN
 ---------------------------------------
 
-Download DOLFIN, and make sure that all the dependencies and their location are correct:
+Download DOLFIN, and make sure that all the dependencies and their locations are correct:
 
 ```bash
 cd $BUILD_DIR
