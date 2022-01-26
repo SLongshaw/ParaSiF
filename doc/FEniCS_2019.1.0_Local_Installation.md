@@ -96,20 +96,20 @@ Download, configure and install hdf5
 -------------------------------------
 
 ```bash
- cd $BUILD_DIR/boost
- wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.10/hdf5-1.10.7/src/hdf5-1.10.7.tar.gz
- tar zxvf hdf5-1.10.7.tar.gz
- cd hdf5-1.10.7  
-  ######### Note that this is one command split in several lines
- ./configure   --prefix=$BUILD_DIR/boost/hdf5-1.10.7_install \
- CC=mpicc CFLAGS=-O3 CXX=mpiCC CXXFLAGS=-O3 --enable-cxx \
- --enable-parallel --enable-unsupported
+cd $BUILD_DIR/boost
+wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.10/hdf5-1.10.7/src/hdf5-1.10.7.tar.gz
+tar zxvf hdf5-1.10.7.tar.gz
+cd hdf5-1.10.7  
+ ######### Note that this is one command split in several lines
+./configure   --prefix=$BUILD_DIR/boost/hdf5-1.10.7_install \
+CC=mpicc CFLAGS=-O3 CXX=mpiCC CXXFLAGS=-O3 --enable-cxx \
+--enable-parallel --enable-unsupported
   
- make -j 8
- make install
- export LD_LIBRARY_PATH=${BUILD_DIR}/boost/hdf5-1.10.7_install/lib:$LD_LIBRARY_PATH
- export LD_RUN_PATH=${BUILD_DIR}/boost/hdf5-1.10.7_install/lib:$LD_RUN_PATH
- ```
+make -j 8
+make install
+export LD_LIBRARY_PATH=${BUILD_DIR}/boost/hdf5-1.10.7_install/lib:$LD_LIBRARY_PATH
+export LD_RUN_PATH=${BUILD_DIR}/boost/hdf5-1.10.7_install/lib:$LD_RUN_PATH
+```
 Download, configure and install FEniCS python components
 ---------------------------------------------------------
 
