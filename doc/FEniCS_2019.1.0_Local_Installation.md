@@ -200,7 +200,7 @@ pip3 install petsc4py
 ```
 Test PETSC and PETSc4py
 ---------------------------------------
-Check that petsc4py is installed correctly and the right path and environmental variable are set.
+Check that petsc4py is installed correctly and the right path and environmental variable are set. Hopefully you get no error.
 ```bash
 make PETSC_DIR=${BUILD_DIR}/boost/petsc-$PETSC_VERSION PETSC_ARCH=arch-linux-c-opt check
 python3 -c "import petsc4py; print(petsc4py.get_include())"
