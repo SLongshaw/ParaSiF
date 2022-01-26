@@ -38,7 +38,7 @@ Load modules and set python paths/build paths
 
  #export PATH=$PATH:$BUILD_DIR/bin
  #export PATH=$PATH:$BUILD_DIR/shared/bin
- export PYTHONPATH=$PYTHONPATH:$BUILD_DIR/lib/python3.8/site-packages
+ #export PYTHONPATH=$PYTHONPATH:$BUILD_DIR/lib/python3.8/site-packages
  #export LD_LIBRARY_PATH=$BUILD_DIR/lib:$LD_LIBRARY_PATH
  export CC=mpicc
  export CXX=mpi++
@@ -83,7 +83,7 @@ Download, configure and install EIGEN
  tar zxvf eigen-3.3.9.tar.gz
  mkdir eigen-3.3.9/build
  cd eigen-3.3.9/build
- cmake ../ -DCMAKE_INSTALL_PREFIX=build -DPYTHON_EXECUTABLE:FILEPATH=$BUILD_DIR/fenics2019_FSI/bin/python3
+ cmake ../ -DCMAKE_INSTALL_PREFIX=./build #-DPYTHON_EXECUTABLE:FILEPATH=$BUILD_DIR/fenics2019_FSI/bin/python3
  make -j 8 install
 ```
 Install MPI for python 
