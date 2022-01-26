@@ -113,7 +113,7 @@ mv OpenFOAM-6-version-6 OpenFOAM-6
 mv ThirdParty-6-version-6 ThirdParty-6
 
 cp ../../ParaSiF/src/MUI_Utility/OpenFOAM_patch/* ./
-
+chmod +x ./patch_OF6-MUI
 ./patch_OF6-MUI
 ```
 
